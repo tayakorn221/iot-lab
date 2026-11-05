@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iot-lab</title>
+<style>
+  /* สีกราฟผ่าน validator ของ dataviz แล้ว (4 ช่องแรก light+dark) · สีเขียว/เหลืองบนพื้นสว่าง < 3:1
+     จึงต้องมีป้ายปลายเส้น + ตาราง (มีทั้งคู่) */
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10); --wash: rgba(11,11,11,.045);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
+    --track: #e9e8e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19;
+      --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --wash: rgba(255,255,255,.05);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+      --track: #2c2c2a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Leelawadee UI", "Noto Sans Thai", sans-serif;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  .sub { color: var(--ink-2); font-size: 13px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--ring); border-radius: 12px;
+  }
+  .banner { padding: 14px 16px; margin-bottom: 16px; color: var(--ink-2); }
+  .banner code { background: var(--wash); padding: 1px 6px; border-radius: 4px; }
+
+  /* --- การ์ดโหนด --- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { padding: 14px 16px; }
+  .tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .dev { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+  .dev span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .key { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+  .pill svg { flex: none; }
+  .hero { font-size: 32px; font-weight: 600; line-height: 1.15; }
+  .hero small { font-size: 16px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
+  .minor { display: flex; gap: 16px; color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+  .seen { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .meter { margin-top: 10px; }
+  .meter-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+  .meter-track { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .meter-fill { height: 100%; border-radius: 3px; }
+
+  /* --- แถบตัวกรอง --- */
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 10px; }
+  .seg { display: inline-flex; background: var(--wash); border-radius: 8px; padding: 2px; }
+  .seg button {
+    font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--ink-2);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer; min-height: 32px;
+  }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--ring); }
+  .seg button:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* --- กราฟ --- */
+  .panel { padding: 12px 8px 6px 4px; margin-bottom: 12px; position: relative; }
+  .panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 4px 12px; }
+  .panel h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  svg.chart { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
+  .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .endlabel { fill: var(--ink-2); font-size: 12px; }
+  .empty { fill: var(--muted); font-size: 13px; }
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 8px 10px; font-size: 13px; min-width: 150px;
+  }
+  .tooltip .t { color: var(--ink-2); margin-bottom: 4px; }
+  .tooltip .row { display: flex; align-items: center; gap: 8px; }
+  .tooltip .row b { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .na { color: var(--muted); font-weight: 400; }
+
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--ink-2); font-size: 14px; padding: 6px 0; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>iot-lab</h1>
+    <span class="sub" id="updated">กำลังโหลด…</span>
+  </header>
+  <div id="banner"></div>
+  <section class="tiles" id="tiles" aria-label="สถานะโหนด"></section>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="ช่วงเวลา" id="ranges">
+      <button data-h="1">1 ชม.</button><button data-h="6">6 ชม.</button>
+      <button data-h="24">24 ชม.</button><button data-h="168">7 วัน</button>
+    </div>
+    <div class="legend" id="legend" aria-label="คำอธิบายสีเส้น"></div>
+  </div>
+
+  <section class="card panel">
+    <h2>ข้อมูลเข้า<small>ช่องว่าง = ไม่มีข้อมูลเข้ามาช่วงนั้น</small></h2>
+    <svg class="chart" id="c-avail" role="img"></svg>
+  </section>
+  <section class="card panel"><h2>อุณหภูมิ<small>°C</small></h2><svg class="chart" id="c-temp" role="img"></svg></section>
+  <section class="card panel"><h2>ความชื้นสัมพัทธ์<small>%RH</small></h2><svg class="chart" id="c-rh" role="img"></svg></section>
+  <section class="card panel"><h2>ความกดอากาศ<small>hPa</small></h2><svg class="chart" id="c-pres" role="img"></svg></section>
+
+  <details id="tabledetails">
+    <summary>ดูเป็นตาราง (40 ช่วงเวลาล่าสุด)</summary>
+    <div class="tablewrap"><table id="table"></table></div>
+  </details>
+</main>
+<div class="tooltip" id="tip" role="status"></div>
+
+<script>
+"use strict";
+const REFRESH_MS = 10000;
+const SLOTS = 8;
+const METRICS = [
+  { id: "c-temp", idx: 1, name: "อุณหภูมิ", unit: "°C", dp: 1 },
+  { id: "c-rh",   idx: 2, name: "ความชื้น", unit: "%",  dp: 1 },
+  { id: "c-pres", idx: 3, name: "ความกด",  unit: "hPa", dp: 1 },
+];
+const M = { top: 8, right: 76, bottom: 24, left: 48 };
+const CHART_H = 170;
+
+let hours = 24;
+try { hours = +localStorage.getItem("iotlab-hours") || 24; } catch (_) {}
+let overview = null, series = null, hoverT = null;
+
+const $ = (s) => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, text) => {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  return n;
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// สีตามตัวโหนด ไม่ใช่ตามลำดับที่โผล่ในกราฟ — เรียงจาก device_id ทั้งหมดที่ระบบรู้จัก
+function colorOf(dev) {
+  const ids = (overview?.devices || []).map((d) => d.device_id);
+  const i = ids.indexOf(dev);
+  return i >= 0 && i < SLOTS ? `var(--s${i + 1})` : "var(--muted)";
+}
+
+const fmtTime = (t) => new Date(t * 1000).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+const fmtTimeS = (t) => new Date(t * 1000).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const fmtDate = (t) => new Date(t * 1000).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+const fmtNum = (v, dp) => (v == null ? "–" : v.toLocaleString("th-TH", { minimumFractionDigits: dp, maximumFractionDigits: dp }));
+function fmtAge(s) {
+  if (s < 60) return `${s} วินาที`;
+  if (s < 3600) return `${Math.floor(s / 60)} นาที`;
+  if (s < 86400) return `${Math.floor(s / 3600)} ชม. ${Math.floor((s % 3600) / 60)} นาที`;
+  return `${Math.floor(s / 86400)} วัน`;
+}
+const tzOff = () => -new Date().getTimezoneOffset() * 60;
+// วันนี้แสดงแค่เวลา · ข้ามวันแล้วต้องมีวันที่ ไม่งั้น "ตั้งแต่ 18:27" อ่านผิดได้
+const sameDay = (a, b) => Math.floor((a + tzOff()) / 86400) === Math.floor((b + tzOff()) / 86400);
+const fmtWhen = (t) => (sameDay(t, overview.now) ? fmtTime(t) : `${fmtDate(t)} ${fmtTime(t)}`);
+
+// ---------- โหลดข้อมูล ----------
+async function load() {
+  try {
+    const [o, s] = await Promise.all([
+      fetch("/api/overview").then((r) => r.json()),
+      fetch(`/api/series?hours=${hours}`).then((r) => r.json()),
+    ]);
+    overview = o; series = s;
+    render();
+    $("#updated").textContent = `อัปเดตทุก 10 วินาที · ล่าสุด ${fmtTimeS(o.now)}`;
+  } catch (e) {
+    $("#updated").textContent = "ต่อ dashboard ไม่ได้ — server ยังรันอยู่ไหม";
+  }
+}
+
+function render() {
+  renderBanner(); renderTiles(); renderLegend(); renderCharts(); renderTable();
+}
+
+function renderBanner() {
+  const b = $("#banner");
+  if (!overview.db_found) {
+    b.innerHTML = `<div class="card banner">ยังไม่มีฐานข้อมูลที่ <code>${esc(overview.db)}</code> — เปิด ingest ก่อน แล้วรอข้อความแรกเข้ามา</div>`;
+  } else if (!overview.devices.length) {
+    b.innerHTML = `<div class="card banner">ฐานข้อมูลยังว่าง — ยังไม่มีโหนดส่งข้อมูลเข้ามา ลองรัน <code>py tools/fake-node.py</code></div>`;
+  } else b.innerHTML = "";
+}
+
+// ---------- การ์ดโหนด ----------
+const ICON = {
+  good: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="var(--good)"/><path d="M3.5 6.2l1.7 1.7 3.3-3.6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warning: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l5.2 9.5H.8z" fill="var(--warning)"/><path d="M6 4.6v2.6" stroke="#0b0b0b" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="8.8" r=".8" fill="#0b0b0b"/></svg>',
+  critical: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="var(--critical)"/><path d="M4 4l4 4M8 4l-4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  unknown: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--muted)" stroke-width="1.5"/></svg>',
+};
+
+function statusOf(d) {
+  const age = d.last ? overview.now - d.last.ts : null;
+  if (d.status === "offline") return { kind: "critical", text: `ออฟไลน์ ตั้งแต่ ${fmtWhen(d.status_since)}` };
+  if (d.status === "online" && age != null && age > overview.stale_s) return { kind: "warning", text: `เงียบไป ${fmtAge(age)}` };
+  if (d.status === "online") return { kind: "good", text: "ออนไลน์" };
+  return { kind: "unknown", text: "ไม่ทราบสถานะ" };
+}
+
+function renderTiles() {
+  $("#tiles").innerHTML = overview.devices.map((d) => {
+    const st = statusOf(d);
+    const L = d.last || {};
+    const cov = d.coverage_24h;
+    const covOk = cov != null && cov >= 0.95; // เกณฑ์ ROADMAP ด่าน 2
+    return `<article class="card tile">
+      <div class="tile-head">
+        <div class="dev"><i class="key" style="background:${colorOf(d.device_id)}"></i><span>${esc(d.device_id)}</span></div>
+        <span class="pill">${ICON[st.kind]}${esc(st.text)}</span>
+      </div>
+      <div class="hero">${fmtNum(L.temp_c, 1)}<small>°C</small></div>
+      <div class="minor"><span>ความชื้น ${fmtNum(L.rh_pct, 1)}%</span><span>${fmtNum(L.pres_hpa, 1)} hPa</span></div>
+      <div class="seen">${d.last ? `ข้อมูลล่าสุดเมื่อ ${fmtAge(overview.now - L.ts)}ที่แล้ว (${fmtTimeS(L.ts)})` : "ยังไม่เคยส่งข้อมูล"}</div>
+      ${cov == null ? "" : `<div class="meter">
+        <div class="meter-label"><span>ข้อมูลครบใน 24 ชม.</span><span>${fmtNum(cov * 100, 1)}% · ${d.received_24h.toLocaleString("th-TH")}/${d.expected_24h.toLocaleString("th-TH")}</span></div>
+        <div class="meter-track"><div class="meter-fill" style="width:${(cov * 100).toFixed(1)}%;background:var(${covOk ? "--good" : "--warning"})"></div></div>
+      </div>`}
+    </article>`;
+  }).join("");
+}
+
+function seriesDevices() {
+  return overview.devices.map((d) => d.device_id).filter((id) => series.devices[id]);
+}
+
+function renderLegend() {
+  const ids = seriesDevices();
+  // เส้นเดียวไม่ต้องมี legend · สองเส้นขึ้นไปต้องมีเสมอ
+  $("#legend").innerHTML = ids.length < 2 ? "" :
+    ids.map((id) => `<span><i class="key" style="background:${colorOf(id)}"></i>${esc(id)}</span>`).join("");
+}
+
+// ---------- สเกล ----------
+function niceTicks(min, max, count) {
+  if (!isFinite(min)) return { lo: 0, hi: 1, ticks: [0, 1] };
+  if (min === max) { min -= 1; max += 1; }
+  const raw = (max - min) / count, mag = 10 ** Math.floor(Math.log10(raw)), e = raw / mag;
+  const step = (e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1) * mag;
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(10));
+  // ทศนิยมเท่ากันทั้งแกน ตามขนาดช่วงห่าง (0.2 → 1 ตำแหน่ง · 5 → 0 ตำแหน่ง)
+  return { lo, hi, ticks, dp: Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) };
+}
+const TSTEPS = [300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+function timeTicks(from, to, maxTicks) {
+  const step = TSTEPS.find((s) => (to - from) / s <= maxTicks) || 86400;
+  const off = tzOff(), out = [];
+  for (let t = Math.ceil((from + off) / step) * step - off; t <= to; t += step) out.push(t);
+  return out;
+}
+function tickLabel(t) {
+  const local = (t + tzOff()) % 86400;
+  return local === 0 ? fmtDate(t) : fmtTime(t);
+}
+
+// เส้นขาดเมื่อช่องว่างระหว่างจุดยาวกว่านี้
+const gapLimit = () => Math.max(series.bucket_s * 2.5, series.interval_s * 3);
+
+// แบ่งจุดของโหนดเป็นช่วงต่อเนื่อง (ใช้ทั้งเส้นกราฟและแถบข้อมูลเข้า)
+function runs(points, idx) {
+  const out = []; let cur = [];
+  for (const p of points) {
+    const v = idx == null ? 1 : p[idx];
+    if (v == null || (cur.length && p[0] - cur[cur.length - 1][0] > gapLimit())) {
+      if (cur.length) out.push(cur);
+      cur = [];
+    }
+    if (v != null) cur.push(p);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
+function frame(svg, h) {
+  const w = svg.clientWidth || svg.parentNode.clientWidth;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("height", h);
+  svg.replaceChildren();
+  const x = (t) => M.left + ((t - series.from) / (series.to - series.from)) * (w - M.left - M.right);
+  return { w, x };
+}
+
+function drawXAxis(svg, w, x, yBase, gridTop) {
+  for (const t of timeTicks(series.from, series.to, Math.max(2, Math.floor((w - M.left - M.right) / 90)))) {
+    svg.append(el("line", { x1: x(t), x2: x(t), y1: gridTop, y2: yBase, stroke: "var(--grid)", "stroke-width": 1 }));
+    svg.append(el("text", { x: x(t), y: yBase + 16, "text-anchor": "middle", class: "tick" }, tickLabel(t)));
+  }
+  svg.append(el("line", { x1: M.left, x2: w - M.right, y1: yBase, y2: yBase, stroke: "var(--axis)", "stroke-width": 1 }));
+}
+
+// ---------- กราฟเส้น ----------
+function renderLine(m) {
+  const svg = $("#" + m.id);
+  const { w, x } = frame(svg, CHART_H);
+  const ids = seriesDevices();
+  const yBase = CHART_H - M.bottom;
+  let min = Infinity, max = -Infinity;
+  for (const id of ids) for (const p of series.devices[id]) if (p[m.idx] != null) { min = Math.min(min, p[m.idx]); max = Math.max(max, p[m.idx]); }
+  if (min === Infinity) {
+    drawXAxis(svg, w, x, yBase, M.top);
+    svg.append(el("text", { x: (M.left + w - M.right) / 2, y: CHART_H / 2, "text-anchor": "middle", class: "empty" }, "ไม่มีข้อมูลในช่วงนี้"));
+    svg.setAttribute("aria-label", `${m.name}: ไม่มีข้อมูลในช่วงนี้`);
+    return;
+  }
+  const pad = (max - min) * 0.08 || 0.5;
+  const sc = niceTicks(min - pad, max + pad, 4);
+  const y = (v) => M.top + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (yBase - M.top);
+
+  for (const v of sc.ticks) {
+    svg.append(el("line", { x1: M.left, x2: w - M.right, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }));
+    svg.append(el("text", { x: M.left - 8, y: y(v) + 4, "text-anchor": "end", class: "tick" }, fmtNum(v, sc.dp)));
+  }
+  drawXAxis(svg, w, x, yBase, M.top);
+
+  const ends = [];
+  for (const id of ids) {
+    const color = colorOf(id);
+    for (const r of runs(series.devices[id], m.idx)) {
+      if (r.length === 1) {
+        svg.append(el("circle", { cx: x(r[0][0]), cy: y(r[0][m.idx]), r: 2, fill: color }));
+        continue;
+      }
+      const d = r.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[m.idx]).toFixed(1)}`).join("");
+      svg.append(el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    const pts = series.devices[id].filter((p) => p[m.idx] != null);
+    const last = pts[pts.length - 1];
+    svg.append(el("circle", { cx: x(last[0]), cy: y(last[m.idx]), r: 4, fill: color, stroke: "var(--surface)", "stroke-width": 2 }));
+    ends.push({ id, x: x(last[0]), y: y(last[m.idx]), v: last[m.idx] });
+  }
+  // ป้ายปลายเส้น: ถ้าป้ายชนกัน ไม่ขยับหนี — ปล่อยให้ legend + tooltip ทำหน้าที่แทน
+  const clash = ends.some((a, i) => ends.some((b, j) => i < j && Math.abs(a.y - b.y) < 15 && Math.abs(a.x - b.x) < 70));
+  if (!clash) for (const e of ends) {
+    svg.append(el("text", { x: e.x + 8, y: e.y + 4, class: "endlabel" }, ids.length > 1 ? `${e.id} ${fmtNum(e.v, m.dp)}` : fmtNum(e.v, m.dp)));
+  }
+
+  svg.append(el("line", { class: "xhair", x1: 0, x2: 0, y1: M.top, y2: yBase, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" }));
+  const hovers = el("g", { class: "hoverdots" });
+  svg.append(hovers);
+  svg._ctx = { x, y, m, ids };
+  const last = ends.map((e) => `${e.id} ${fmtNum(e.v, m.dp)} ${m.unit}`).join(", ");
+  svg.setAttribute("aria-label", `${m.name} ช่วง ${hours} ชั่วโมง ต่ำสุด ${fmtNum(min, m.dp)} สูงสุด ${fmtNum(max, m.dp)} ${m.unit} · ค่าล่าสุด ${last}`);
+  attachHover(svg, w, x);
+}
+
+// ---------- แถบข้อมูลเข้า ----------
+function renderAvail() {
+  const svg = $("#c-avail");
+  const ids = seriesDevices();
+  const rowH = 18, h = M.top + Math.max(1, ids.length) * rowH + M.bottom;
+  const { w, x } = frame(svg, h);
+  const yBase = h - M.bottom;
+  drawXAxis(svg, w, x, yBase, M.top);
+  if (!ids.length) {
+    svg.append(el("text", { x: (M.left + w - M.right) / 2, y: M.top + 12, "text-anchor": "middle", class: "empty" }, "ไม่มีข้อมูลในช่วงนี้"));
+    svg.setAttribute("aria-label", "ข้อมูลเข้า: ไม่มีข้อมูลในช่วงนี้");
+    return;
+  }
+  const desc = [];
+  ids.forEach((id, i) => {
+    const cy = M.top + i * rowH + rowH / 2;
+    svg.append(el("text", { x: M.left - 8, y: cy + 4, "text-anchor": "end", class: "tick" }, id));
+    svg.append(el("rect", { x: M.left, y: cy - 3, width: w - M.left - M.right, height: 6, rx: 3, fill: "var(--track)" }));
+    const rs = runs(series.devices[id], null);
+    for (const r of rs) {
+      const x0 = x(r[0][0]), x1 = Math.max(x0 + 2, x(Math.min(series.to, r[r.length - 1][0] + series.bucket_s)));
+      svg.append(el("rect", { x: x0, y: cy - 3, width: x1 - x0, height: 6, rx: 3, fill: colorOf(id) }));
+    }
+    desc.push(`${id} ${rs.length > 1 ? `ขาด ${rs.length - 1} ช่วง` : "ต่อเนื่อง"}`);
+  });
+  svg.append(el("line", { class: "xhair", x1: 0, x2: 0, y1: M.top, y2: yBase, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" }));
+  svg.setAttribute("aria-label", `ข้อมูลเข้า ช่วง ${hours} ชั่วโมง: ${desc.join(", ")}`);
+  attachHover(svg, w, x);
+}
+
+function renderCharts() {
+  if (!series) return;
+  renderAvail();
+  METRICS.forEach(renderLine);
+  if (hoverT != null) showHover(hoverT);
+}
+
+// ---------- hover: เส้นตั้งร่วมทุกกราฟ + tooltip ----------
+function attachHover(svg, w, x) {
+  const ov = el("rect", { x: M.left, y: 0, width: Math.max(0, w - M.left - M.right), height: svg.viewBox.baseVal.height, fill: "transparent" });
+  svg.append(ov);
+  const pick = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const px = ((ev.clientX - r.left) / r.width) * w;
+    const t = series.from + ((px - M.left) / (w - M.left - M.right)) * (series.to - series.from);
+    return Math.round(t / series.bucket_s) * series.bucket_s;
+  };
+  ov.addEventListener("pointermove", (ev) => { hoverT = pick(ev); showHover(hoverT, ev, svg); });
+  ov.addEventListener("pointerleave", () => { hoverT = null; hideHover(); });
+}
+
+function pointAt(id, t) {
+  const pts = series.devices[id];
+  let lo = 0, hi = pts.length - 1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (pts[mid][0] < t) lo = mid + 1; else if (pts[mid][0] > t) hi = mid - 1; else return pts[mid]; }
+  return null;
+}
+
+function showHover(t, ev, srcSvg) {
+  for (const svg of document.querySelectorAll("svg.chart")) {
+    const xh = svg.querySelector(".xhair");
+    if (!xh || !series) continue;
+    const w = svg.viewBox.baseVal.width;
+    const xx = M.left + ((t - series.from) / (series.to - series.from)) * (w - M.left - M.right);
+    xh.setAttribute("x1", xx); xh.setAttribute("x2", xx); xh.setAttribute("visibility", "visible");
+    const g = svg.querySelector(".hoverdots");
+    if (g && svg._ctx) {
+      g.replaceChildren();
+      for (const id of svg._ctx.ids) {
+        const p = pointAt(id, t);
+        if (p && p[svg._ctx.m.idx] != null) g.append(el("circle", { cx: xx, cy: svg._ctx.y(p[svg._ctx.m.idx]), r: 4, fill: colorOf(id), stroke: "var(--surface)", "stroke-width": 2 }));
+      }
+    }
+  }
+  if (!ev) return;
+  const tip = $("#tip");
+  const ids = seriesDevices();
+  const ctx = srcSvg._ctx;
+  const head = series.bucket_s > series.interval_s
+    ? `${fmtDate(t)} ${fmtTime(t)}–${fmtTime(t + series.bucket_s)} <span class="na">(เฉลี่ย)</span>`
+    : `${fmtDate(t)} ${fmtTimeS(t)}`;
+  const rows = ids.map((id) => {
+    const p = pointAt(id, t);
+    let val;
+    if (!p) val = '<b class="na">ไม่มีข้อมูล</b>';
+    else if (ctx) val = p[ctx.m.idx] == null ? '<b class="na">–</b>' : `<b>${fmtNum(p[ctx.m.idx], ctx.m.dp)} ${ctx.m.unit}</b>`;
+    else val = `<b>${p[4]} ข้อความ</b>`;
+    return `<div class="row"><i class="key" style="background:${colorOf(id)}"></i>${esc(id)}${val}</div>`;
+  }).join("");
+  tip.innerHTML = `<div class="t">${head}</div>${rows}`;
+  tip.style.display = "block";
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = ev.clientX + 14, top = ev.clientY + 14;
+  if (left + tw > innerWidth - 8) left = ev.clientX - tw - 14;
+  if (top + th > innerHeight - 8) top = ev.clientY - th - 14;
+  tip.style.left = Math.max(8, left) + "px"; tip.style.top = Math.max(8, top) + "px";
+}
+
+function hideHover() {
+  $("#tip").style.display = "none";
+  document.querySelectorAll(".xhair").forEach((x) => x.setAttribute("visibility", "hidden"));
+  document.querySelectorAll(".hoverdots").forEach((g) => g.replaceChildren());
+}
+
+// ---------- ตาราง ----------
+function renderTable() {
+  if (!series) return;
+  const rows = [];
+  for (const id of seriesDevices()) for (const p of series.devices[id]) rows.push([id, ...p]);
+  rows.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const isAvg = series.bucket_s > series.interval_s;
+  const avg = isAvg ? " (เฉลี่ย)" : "";
+  const when = (t) => `${fmtDate(t)} ${isAvg ? fmtTime(t) : fmtTimeS(t)}`;
+  $("#table").innerHTML = `<thead><tr><th>เวลา</th><th>โหนด</th><th>อุณหภูมิ °C${avg}</th><th>ความชื้น %${avg}</th><th>ความกด hPa${avg}</th><th>ข้อความ</th></tr></thead><tbody>` +
+    rows.slice(0, 40).map((r) => `<tr><td>${when(r[1])}</td><td>${esc(r[0])}</td><td>${fmtNum(r[2], 2)}</td><td>${fmtNum(r[3], 1)}</td><td>${fmtNum(r[4], 1)}</td><td>${r[5]}</td></tr>`).join("") +
+    "</tbody>";
+}
+
+// ---------- ช่วงเวลา ----------
+function syncRanges() {
+  document.querySelectorAll("#ranges button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.h === hours)));
+}
+document.querySelectorAll("#ranges button").forEach((b) => b.addEventListener("click", () => {
+  hours = +b.dataset.h;
+  try { localStorage.setItem("iotlab-hours", hours); } catch (_) {}
+  syncRanges(); load();
+}));
+if (![1, 6, 24, 168].includes(hours)) hours = 24;
+syncRanges();
+
+let rt;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderCharts, 120); });
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>

@@ -27,7 +27,8 @@ from contract import ContractError, Telemetry, parse_status, parse_telemetry, pa
 
 HOST = os.environ.get("MQTT_HOST", "localhost")
 PORT = int(os.environ.get("MQTT_PORT", "1883"))
-DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).resolve().parent.parent / "data" / "iotlab.sqlite"))
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "iotlab.sqlite"
+DB_PATH = Path(os.environ.get("DB_PATH", DEFAULT_DB_PATH))
 CLIENT_ID = "iotlab-ingest"  # ต้องคงที่ broker ถึงจำ session เดิมได้
 
 SCHEMA = """
@@ -87,6 +88,9 @@ class Ingest:
             log.warning("หลุดจาก broker (%s) — กำลังต่อใหม่", reason_code)
 
     def on_message(self, client, userdata, msg):
+        if not msg.payload:
+            # payload ว่าง = มีคนล้างข้อความ retain (mosquitto_pub -r -n) ไม่ใช่ข้อมูล — ข้ามเงียบ ๆ
+            return
         try:
             self.handle(msg.topic, msg.payload, int(time.time()))
         except ContractError as e:

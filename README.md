@@ -28,7 +28,10 @@ py platform/ingest/ingest.py
 ```bash
 py tools/fake-node.py
 ```
-รายละเอียดและผลทดสอบความทนทานอยู่ที่ [platform/README.md](platform/README.md)
+```bash
+py platform/dashboard/app.py
+```
+แล้วเปิด http://127.0.0.1:8080 · รายละเอียด ผลทดสอบความทนทาน และวิธีดูฐานตัวอย่าง อยู่ที่ [platform/README.md](platform/README.md)
 
 ## ด่าน
 | ด่าน | ชื่อ | สถานะ |

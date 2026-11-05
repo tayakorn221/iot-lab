@@ -32,6 +32,7 @@ def main() -> None:
     # Windows: ถ้า redirect ลงไฟล์ จะใช้ cp874 ซึ่งพิมพ์ ← ไม่ได้
     # line_buffering: เขียนลงไฟล์ทีละบรรทัด — โปรเซสโดนฆ่าแล้ว log ไม่หาย
     sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # argparse เขียน error ลงที่นี่
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--host", default="localhost")
     p.add_argument("--port", type=int, default=1883)
