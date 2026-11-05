@@ -1,0 +1,21 @@
+# ความลับ
+secrets.h
+.env
+
+# PlatformIO
+.pio/
+.vscode/
+
+# platform data
+platform/data/
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+Thumbs.db
+.DS_Store
