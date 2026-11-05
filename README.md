@@ -17,12 +17,18 @@
 
 **กฎข้อเดียวที่ห้ามแหก:** แก้ topic หรือ payload เมื่อไหร่ ให้แก้ `shared/mqtt-contract.md` ก่อน แล้วค่อยแก้โค้ดสองฝั่งตาม
 
-## Quick Start (ฝั่ง platform)
+## Quick Start (ฝั่ง platform — ยังไม่ต้องมีบอร์ด)
+เปิด Docker Desktop ก่อน แล้วรันจากโฟลเดอร์นี้ทีละหน้าต่าง:
 ```bash
-cd platform
-cp .env.example .env
-docker compose up -d
+docker compose -f platform/docker-compose.yml up -d
 ```
+```bash
+py platform/ingest/ingest.py
+```
+```bash
+py tools/fake-node.py
+```
+รายละเอียดและผลทดสอบความทนทานอยู่ที่ [platform/README.md](platform/README.md)
 
 ## ด่าน
 | ด่าน | ชื่อ | สถานะ |
