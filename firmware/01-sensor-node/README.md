@@ -52,7 +52,7 @@ git check-ignore -v include/secrets.h
 | GND | `GND` | |
 | SDA | `GPIO 21` (`D21`) | |
 | SCL | `GPIO 22` (`D22`) | |
-| ADDR, CS | ไม่ต่อ | address เป็น 0x76 หรือ 0x77 ก็ได้ เฟิร์มแวร์หาเองทั้งสองค่า |
+| ADDR, CS | ไม่ต่อ | ปล่อย ADDR ว่าง = address `0x77` (ค่าตั้งต้นของ Waveshare) · ต่อลง GND = `0x76` · เฟิร์มแวร์หาเองทั้งสองค่า |
 
 ถอด USB ทุกครั้งก่อนย้ายสาย · บอร์ด 38 ขากว้างจนเต็ม breadboard → เสียบสายตรงจากขาบอร์ด ไม่ต้องผ่าน breadboard
 
