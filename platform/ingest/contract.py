@@ -13,7 +13,8 @@ import re
 from dataclasses import dataclass
 
 TOPIC_RE = re.compile(r"^iotlab/v1/([a-z0-9-]+)/(telemetry|status)$")
-METRICS = ("temp_c", "rh_pct", "pres_hpa")
+METRICS = ("temp_c", "rh_pct", "pres_hpa", "pm1_ugm3", "pm25_ugm3", "pm10_ugm3")
+NON_NEGATIVE = ("pm1_ugm3", "pm25_ugm3", "pm10_ugm3")  # ฝุ่นติดลบ = เซนเซอร์/เฟิร์มแวร์พัง
 STATUSES = ("online", "offline")
 
 
@@ -30,6 +31,9 @@ class Telemetry:
     temp_c: float | None
     rh_pct: float | None
     pres_hpa: float | None
+    pm1_ugm3: float | None
+    pm25_ugm3: float | None
+    pm10_ugm3: float | None
     raw: str  # payload ดิบ เก็บไว้เผื่อ contract เพิ่ม field ทีหลัง
 
 
@@ -54,6 +58,8 @@ def _metric(data: dict, name: str) -> float | None:
         raise ContractError(f"{name} ต้องเป็นตัวเลข ได้ {v!r}")
     if not math.isfinite(v):
         raise ContractError(f"{name} ต้องเป็นตัวเลขจริง ได้ {v!r}")
+    if name in NON_NEGATIVE and v < 0:
+        raise ContractError(f"{name} ติดลบไม่ได้ ได้ {v!r}")
     return float(v)
 
 
@@ -82,9 +88,7 @@ def parse_telemetry(device_id: str, payload: bytes, received_at: int) -> Telemet
         ts=ts,
         ts_source=ts_source,
         seq=data["seq"],
-        temp_c=_metric(data, "temp_c"),
-        rh_pct=_metric(data, "rh_pct"),
-        pres_hpa=_metric(data, "pres_hpa"),
+        **{name: _metric(data, name) for name in METRICS},
         raw=raw,
     )
 

@@ -4,8 +4,8 @@
 ฐานตัวอย่างจึงหน้าตาเหมือนของจริงทุกคอลัมน์
 
 ที่ใส่ไว้ให้เห็นในกราฟ:
-- node-01 เดินครบตลอด · อุณหภูมิขึ้นลงตามช่วงวัน
-- node-02 เริ่มช้ากว่า 6 ชม. · มีช่วงเน็ตหลุด 40 นาที · มีข้อความหายประปราย · ตอนนี้ offline
+- node-01 เดินครบตลอด · อุณหภูมิขึ้นลงตามช่วงวัน · มีเซนเซอร์ฝุ่น PM2.5 พุ่งช่วงรถติดเช้า-เย็น
+- node-02 ไม่มีเซนเซอร์ฝุ่น (ไม่ส่ง field pm*) · เริ่มช้ากว่า 6 ชม. · มีช่วงเน็ตหลุด 40 นาที · มีข้อความหายประปราย · ตอนนี้ offline
 
 ต้องระบุ --db เสมอ (กันเขียนทับฐานจริงโดยไม่ตั้งใจ):
   py tools/seed-demo.py --db _demo.sqlite
@@ -72,6 +72,11 @@ def main() -> None:
                 "rh_pct": round(base_rh - 7 * day + noise[dev] * 10, 1),
                 "pres_hpa": round(1009 + 1.4 * math.sin(ts / 43200 * 2 * math.pi) + noise[dev], 1),
             }
+            if dev == "node-01":
+                hour = ((ts + 7 * 3600) % 86400) / 3600  # เวลาไทย
+                rush = 22 * math.exp(-((hour - 8) ** 2) / 2) + 16 * math.exp(-((hour - 18.5) ** 2) / 3)
+                pm25 = max(1.0, 16 + rush + noise[dev] * 25)
+                msg.update(pm1_ugm3=round(pm25 * 0.7), pm25_ugm3=round(pm25), pm10_ugm3=round(pm25 * 1.3))
             ing.handle(f"iotlab/v1/{dev}/telemetry", json.dumps(msg).encode(), ts)
             count += 1
         if ts == gap[0]:

@@ -10,6 +10,7 @@
   py tools/fake-node.py --device-id fake-02 --interval 1 --count 30
   py tools/fake-node.py --no-time                # ส่ง ts=0 เหมือนบอร์ดที่ยังไม่ได้เวลา NTP
   py tools/fake-node.py --bad-every 5            # ทุกข้อความที่ 5 ส่ง payload เสีย ไว้ดูว่า ingest ทิ้งถูก
+  py tools/fake-node.py --pm                     # มีเซนเซอร์ฝุ่น PMS5003 ด้วย (ส่ง pm1/pm25/pm10)
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ def main() -> None:
     p.add_argument("--count", type=int, default=0, help="ส่งกี่ข้อความแล้วหยุด (0 = ไม่หยุด)")
     p.add_argument("--no-time", action="store_true", help="ส่ง ts=0 ทุกข้อความ")
     p.add_argument("--bad-every", type=int, default=0, help="ทุกข้อความที่ N ส่ง payload ผิด contract")
+    p.add_argument("--pm", action="store_true", help="จำลองเซนเซอร์ฝุ่น — ส่ง pm1_ugm3 / pm25_ugm3 / pm10_ugm3")
     a = p.parse_args()
 
     if not re.fullmatch(r"[a-z0-9-]+", a.device_id):
@@ -67,7 +69,7 @@ def main() -> None:
     client.connect_async(a.host, a.port, keepalive=30)
     client.loop_start()
 
-    temp, rh, pres = 27.0, 60.0, 1009.0
+    temp, rh, pres, pm25 = 27.0, 60.0, 1009.0, 20.0
     seq = 0
     try:
         while a.count == 0 or seq < a.count:
@@ -82,13 +84,20 @@ def main() -> None:
                 "rh_pct": round(rh, 1),
                 "pres_hpa": round(pres, 1),
             }
+            if a.pm:
+                pm25 = walk(pm25, 1.5, 2, 150)
+                # PMS5003 ส่งเป็นจำนวนเต็ม · PM1 ≤ PM2.5 ≤ PM10 เสมอ (ฝุ่นเล็กเป็นส่วนหนึ่งของฝุ่นใหญ่)
+                msg["pm1_ugm3"] = round(pm25 * 0.7)
+                msg["pm25_ugm3"] = round(pm25)
+                msg["pm10_ugm3"] = round(pm25 * 1.3)
             if a.bad_every and seq % a.bad_every == 0:
                 msg["temp_c"] = "27.4"  # สตริงแทนตัวเลข — ingest ต้องทิ้ง
                 tag = "  ← จงใจผิด"
             else:
                 tag = ""
             client.publish(f"{base}/telemetry", json.dumps(msg), qos=1)
-            print(f"[{a.device_id}] seq={seq} temp={msg['temp_c']} rh={msg['rh_pct']}{tag}")
+            pm = f" pm25={msg['pm25_ugm3']}" if a.pm else ""
+            print(f"[{a.device_id}] seq={seq} temp={msg['temp_c']} rh={msg['rh_pct']}{pm}{tag}")
             if a.count == 0 or seq < a.count:
                 time.sleep(a.interval)
     except KeyboardInterrupt:

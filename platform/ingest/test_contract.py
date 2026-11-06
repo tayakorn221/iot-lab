@@ -54,6 +54,24 @@ def test_int_metric_becomes_float():
     assert tel('{"ts":0,"seq":1,"temp_c":27}').temp_c == 27.0
 
 
+def test_pm_fields():
+    t = tel('{"ts":0,"seq":1,"pm1_ugm3":12,"pm25_ugm3":18,"pm10_ugm3":23}')
+    assert (t.pm1_ugm3, t.pm25_ugm3, t.pm10_ugm3) == (12.0, 18.0, 23.0)
+
+
+def test_node_without_dust_sensor():
+    t = tel('{"ts":0,"seq":1,"temp_c":27}')
+    assert (t.pm1_ugm3, t.pm25_ugm3, t.pm10_ugm3) == (None, None, None)
+
+
+def test_pm_zero_is_real_value():
+    assert tel('{"ts":0,"seq":1,"pm25_ugm3":0}').pm25_ugm3 == 0.0  # อากาศสะอาดมากได้ 0 จริง
+
+
+def test_negative_temp_allowed():
+    assert tel('{"ts":0,"seq":1,"temp_c":-3.5}').temp_c == -3.5  # ห้ามลบใช้กับฝุ่นเท่านั้น
+
+
 def test_extra_field_kept_in_raw():
     t = tel('{"ts":0,"seq":1,"co2_ppm":410}')
     assert "co2_ppm" in t.raw
@@ -70,6 +88,8 @@ def test_extra_field_kept_in_raw():
     '{"ts":0,"seq":1,"temp_c":"27"}',
     '{"ts":0,"seq":1,"temp_c":false}',
     '{"ts":0,"seq":1,"temp_c":NaN}',
+    '{"ts":0,"seq":1,"pm25_ugm3":-1}',  # ฝุ่นติดลบ
+    '{"ts":0,"seq":1,"pm10_ugm3":"23"}',
 ])
 def test_telemetry_rejected(payload):
     with pytest.raises(ContractError):

@@ -21,7 +21,10 @@ iotlab/v1/<device_id>/status      online / offline    QoS 1   retain: ใช่ 
   "seq": 42,
   "temp_c": 27.41,
   "rh_pct": 61.2,
-  "pres_hpa": 1009.8
+  "pres_hpa": 1009.8,
+  "pm1_ugm3": 12,
+  "pm25_ugm3": 18,
+  "pm10_ugm3": 23
 }
 ```
 
@@ -32,8 +35,16 @@ iotlab/v1/<device_id>/status      online / offline    QoS 1   retain: ใช่ 
 | `temp_c` | float | °C | ไม่ | |
 | `rh_pct` | float | %RH | ไม่ | |
 | `pres_hpa` | float | hPa | ไม่ | |
+| `pm1_ugm3` | number ≥ 0 | µg/m³ | ไม่ | ฝุ่น PM1.0 |
+| `pm25_ugm3` | number ≥ 0 | µg/m³ | ไม่ | ฝุ่น PM2.5 |
+| `pm10_ugm3` | number ≥ 0 | µg/m³ | ไม่ | ฝุ่น PM10 |
 
 field ที่เซนเซอร์อ่านไม่ได้ **ไม่ต้องส่ง** ห้ามส่ง `0` แทน — `0` องศาเป็นค่าจริงได้
+(โหนดที่ไม่มีเซนเซอร์ฝุ่นก็แค่ไม่ส่งสาม field `pm*` — ยังเป็น v1 เพราะของเดิมไม่ต้องแก้)
+
+**ค่าฝุ่นจาก Plantower PMS5003/7003:** ใช้ชุด "atmospheric environment" (byte 10–15 ของ frame)
+ไม่ใช่ชุด "CF=1" (byte 4–9) — ชุด CF=1 เป็นค่าสำหรับสอบเทียบในโรงงาน
+· ทิ้งค่าช่วง 30 วินาทีแรกหลังเปิดพัดลม (ยังไม่นิ่ง) · frame ที่ checksum ไม่ผ่านให้ไม่ส่ง field ฝุ่น
 
 ## Payload: status
 

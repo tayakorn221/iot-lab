@@ -55,7 +55,10 @@
   .hero { font-size: 32px; font-weight: 600; line-height: 1.15; }
   .hero small { font-size: 16px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
   .minor { display: flex; gap: 16px; color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+  .pm { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; color: var(--ink-2); }
+  .pm b { color: var(--ink); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .seen { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .reflabel { fill: var(--ink-2); font-size: 11px; }
   .meter { margin-top: 10px; }
   .meter-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
   .meter-track { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
@@ -121,6 +124,7 @@
     <h2>ข้อมูลเข้า<small>ช่องว่าง = ไม่มีข้อมูลเข้ามาช่วงนั้น</small></h2>
     <svg class="chart" id="c-avail" role="img"></svg>
   </section>
+  <section class="card panel"><h2>ฝุ่น PM2.5<small>µg/m³ · เส้นประ = มาตรฐานไทย 37.5 (เทียบค่าเฉลี่ย 24 ชม.)</small></h2><svg class="chart" id="c-pm25" role="img"></svg></section>
   <section class="card panel"><h2>อุณหภูมิ<small>°C</small></h2><svg class="chart" id="c-temp" role="img"></svg></section>
   <section class="card panel"><h2>ความชื้นสัมพัทธ์<small>%RH</small></h2><svg class="chart" id="c-rh" role="img"></svg></section>
   <section class="card panel"><h2>ความกดอากาศ<small>hPa</small></h2><svg class="chart" id="c-pres" role="img"></svg></section>
@@ -136,7 +140,9 @@
 "use strict";
 const REFRESH_MS = 10000;
 const SLOTS = 8;
+// idx = ตำแหน่งในจุดของ /api/series: [t, temp, rh, pres, n, pm25]
 const METRICS = [
+  { id: "c-pm25", idx: 5, name: "PM2.5", unit: "µg/m³", dp: 0, zero: true, ref: { v: 37.5, label: "37.5" } },
   { id: "c-temp", idx: 1, name: "อุณหภูมิ", unit: "°C", dp: 1 },
   { id: "c-rh",   idx: 2, name: "ความชื้น", unit: "%",  dp: 1 },
   { id: "c-pres", idx: 3, name: "ความกด",  unit: "hPa", dp: 1 },
@@ -175,6 +181,16 @@ function fmtAge(s) {
   if (s < 86400) return `${Math.floor(s / 3600)} ชม. ${Math.floor((s % 3600) / 60)} นาที`;
   return `${Math.floor(s / 86400)} วัน`;
 }
+// ระดับคุณภาพอากาศ PM2.5 ของกรมควบคุมมลพิษ (เกณฑ์ปี 2566) — เกณฑ์จริงใช้ค่าเฉลี่ย 24 ชม.
+// ค่าบนการ์ดเป็นค่าขณะนั้น จึงใช้บอกแนวโน้ม ไม่ใช่ประกาศระดับอย่างเป็นทางการ
+const PM_LEVELS = [
+  { max: 15, text: "ดีมาก", kind: "good" },
+  { max: 25, text: "ดี", kind: "good" },
+  { max: 37.5, text: "ปานกลาง", kind: "warning" },
+  { max: 75, text: "เริ่มมีผลต่อสุขภาพ", kind: "critical" },
+  { max: Infinity, text: "มีผลต่อสุขภาพ", kind: "critical" },
+];
+const pmLevel = (v) => PM_LEVELS.find((l) => v <= l.max);
 const tzOff = () => -new Date().getTimezoneOffset() * 60;
 // วันนี้แสดงแค่เวลา · ข้ามวันแล้วต้องมีวันที่ ไม่งั้น "ตั้งแต่ 18:27" อ่านผิดได้
 const sameDay = (a, b) => Math.floor((a + tzOff()) / 86400) === Math.floor((b + tzOff()) / 86400);
@@ -237,6 +253,7 @@ function renderTiles() {
       </div>
       <div class="hero">${fmtNum(L.temp_c, 1)}<small>°C</small></div>
       <div class="minor"><span>ความชื้น ${fmtNum(L.rh_pct, 1)}%</span><span>${fmtNum(L.pres_hpa, 1)} hPa</span></div>
+      ${d.pm_last ? (() => { const lv = pmLevel(d.pm_last.pm25_ugm3); return `<div class="pm">${ICON[lv.kind]}PM2.5 <b>${fmtNum(d.pm_last.pm25_ugm3, 0)}</b> µg/m³ · ${lv.text}</div>`; })() : ""}
       <div class="seen">${d.last ? `ข้อมูลล่าสุดเมื่อ ${fmtAge(overview.now - L.ts)}ที่แล้ว (${fmtTimeS(L.ts)})` : "ยังไม่เคยส่งข้อมูล"}</div>
       ${cov == null ? "" : `<div class="meter">
         <div class="meter-label"><span>ข้อมูลครบใน 24 ชม.</span><span>${fmtNum(cov * 100, 1)}% · ${d.received_24h.toLocaleString("th-TH")}/${d.expected_24h.toLocaleString("th-TH")}</span></div>
@@ -326,12 +343,16 @@ function renderLine(m) {
   for (const id of ids) for (const p of series.devices[id]) if (p[m.idx] != null) { min = Math.min(min, p[m.idx]); max = Math.max(max, p[m.idx]); }
   if (min === Infinity) {
     drawXAxis(svg, w, x, yBase, M.top);
-    svg.append(el("text", { x: (M.left + w - M.right) / 2, y: CHART_H / 2, "text-anchor": "middle", class: "empty" }, "ไม่มีข้อมูลในช่วงนี้"));
-    svg.setAttribute("aria-label", `${m.name}: ไม่มีข้อมูลในช่วงนี้`);
+    const msg = m.zero ? "ยังไม่มีโหนดที่ส่งค่าฝุ่นในช่วงนี้" : "ไม่มีข้อมูลในช่วงนี้";
+    svg.append(el("text", { x: (M.left + w - M.right) / 2, y: CHART_H / 2, "text-anchor": "middle", class: "empty" }, msg));
+    svg.setAttribute("aria-label", `${m.name}: ${msg}`);
     return;
   }
+  const dataMin = min, dataMax = max;
+  if (m.zero) min = 0;                       // ฝุ่นเริ่มแกนที่ 0 — ไม่งั้น 18 กับ 22 ดูห่างกันเกินจริง
+  if (m.ref) max = Math.max(max, m.ref.v);   // ให้เส้นมาตรฐานอยู่ในกรอบเสมอ
   const pad = (max - min) * 0.08 || 0.5;
-  const sc = niceTicks(min - pad, max + pad, 4);
+  const sc = niceTicks(m.zero ? 0 : min - pad, max + pad, 4);
   const y = (v) => M.top + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (yBase - M.top);
 
   for (const v of sc.ticks) {
@@ -339,9 +360,16 @@ function renderLine(m) {
     svg.append(el("text", { x: M.left - 8, y: y(v) + 4, "text-anchor": "end", class: "tick" }, fmtNum(v, sc.dp)));
   }
   drawXAxis(svg, w, x, yBase, M.top);
+  if (m.ref) {
+    svg.append(el("line", { x1: M.left, x2: w - M.right, y1: y(m.ref.v), y2: y(m.ref.v), stroke: "var(--critical)", "stroke-width": 1, "stroke-dasharray": "4 4" }));
+    svg.append(el("text", { x: M.left + 6, y: y(m.ref.v) - 5, class: "reflabel" }, `มาตรฐาน ${m.ref.label}`));
+  }
+  min = dataMin; max = dataMax;  // aria-label ด้านล่างต้องบอกค่าจริง ไม่ใช่ขอบแกน
 
   const ends = [];
   for (const id of ids) {
+    // โหนดที่ไม่เคยส่ง field นี้ในช่วงนี้ (เช่น ไม่มีเซนเซอร์ฝุ่น) — ไม่มีเส้น ไม่มีป้าย
+    if (!series.devices[id].some((p) => p[m.idx] != null)) continue;
     const color = colorOf(id);
     for (const r of runs(series.devices[id], m.idx)) {
       if (r.length === 1) {
@@ -484,8 +512,8 @@ function renderTable() {
   const isAvg = series.bucket_s > series.interval_s;
   const avg = isAvg ? " (เฉลี่ย)" : "";
   const when = (t) => `${fmtDate(t)} ${isAvg ? fmtTime(t) : fmtTimeS(t)}`;
-  $("#table").innerHTML = `<thead><tr><th>เวลา</th><th>โหนด</th><th>อุณหภูมิ °C${avg}</th><th>ความชื้น %${avg}</th><th>ความกด hPa${avg}</th><th>ข้อความ</th></tr></thead><tbody>` +
-    rows.slice(0, 40).map((r) => `<tr><td>${when(r[1])}</td><td>${esc(r[0])}</td><td>${fmtNum(r[2], 2)}</td><td>${fmtNum(r[3], 1)}</td><td>${fmtNum(r[4], 1)}</td><td>${r[5]}</td></tr>`).join("") +
+  $("#table").innerHTML = `<thead><tr><th>เวลา</th><th>โหนด</th><th>อุณหภูมิ °C${avg}</th><th>ความชื้น %${avg}</th><th>ความกด hPa${avg}</th><th>PM2.5 µg/m³${avg}</th><th>ข้อความ</th></tr></thead><tbody>` +
+    rows.slice(0, 40).map((r) => `<tr><td>${when(r[1])}</td><td>${esc(r[0])}</td><td>${fmtNum(r[2], 2)}</td><td>${fmtNum(r[3], 1)}</td><td>${fmtNum(r[4], 1)}</td><td>${fmtNum(r[6], 0)}</td><td>${r[5]}</td></tr>`).join("") +
     "</tbody>";
 }
 

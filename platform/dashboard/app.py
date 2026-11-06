@@ -33,12 +33,21 @@ RANGES_H = (1, 6, 24, 168)
 app = FastAPI(title="iot-lab dashboard", docs_url=None, redoc_url=None)
 
 
+PM_COLS = ("pm1_ugm3", "pm25_ugm3", "pm10_ugm3")
+
+
 def connect() -> sqlite3.Connection | None:
     if not DB_PATH.exists():
         return None
     db = sqlite3.connect(f"file:{DB_PATH.as_posix()}?mode=ro", uri=True)
     db.row_factory = sqlite3.Row
     return db
+
+
+def has_pm(db: sqlite3.Connection) -> bool:
+    """ฐานเก่าที่ ingest ยังไม่ได้เปิดเติมคอลัมน์ฝุ่นจะไม่มีคอลัมน์ pm*
+    dashboard เปิดฐานแบบอ่านอย่างเดียว เติมเองไม่ได้ — เลยถามก่อนแล้วใช้ NULL แทน"""
+    return "pm25_ugm3" in {r[1] for r in db.execute("PRAGMA table_info(telemetry)")}
 
 
 @app.get("/")
@@ -58,10 +67,15 @@ def overview():
             "SELECT device_id FROM telemetry UNION SELECT device_id FROM device_status ORDER BY 1")]
         devices = []
         since = now - 86400
+        pm = has_pm(db)
         for dev in ids:
             last = db.execute(
                 "SELECT ts, temp_c, rh_pct, pres_hpa FROM telemetry WHERE device_id = ? ORDER BY ts DESC LIMIT 1",
                 (dev,)).fetchone()
+            # ค่าฝุ่นล่าสุดแยกถาม — แถวล่าสุดอาจไม่มีฝุ่น (frame checksum ไม่ผ่าน) ทั้งที่โหนดมีเซนเซอร์
+            pm_last = db.execute(
+                f"SELECT ts, {', '.join(PM_COLS)} FROM telemetry WHERE device_id = ? AND pm25_ugm3 IS NOT NULL "
+                "ORDER BY ts DESC LIMIT 1", (dev,)).fetchone() if pm else None
             st = db.execute("SELECT status, updated_at FROM device_status WHERE device_id = ?", (dev,)).fetchone()
             agg = db.execute(
                 "SELECT COUNT(*) AS n, MIN(ts) AS first FROM telemetry WHERE device_id = ? AND ts >= ?",
@@ -73,6 +87,7 @@ def overview():
                 "status": st["status"] if st else None,
                 "status_since": st["updated_at"] if st else None,
                 "last": dict(last) if last else None,
+                "pm_last": dict(pm_last) if pm_last else None,
                 "received_24h": agg["n"],
                 "expected_24h": expected,
                 "coverage_24h": round(min(1.0, agg["n"] / expected), 4) if expected else None,
@@ -94,14 +109,16 @@ def series(hours: int = Query(24)):
     if db is None:
         return out
     with db:
+        pm25 = "pm25_ugm3" if has_pm(db) else "NULL"
+        # จุดละ [t, temp, rh, pres, n, pm25] — pm25 ต่อท้าย ไม่ให้ตำแหน่งเดิมเลื่อน
         rows = db.execute(
             "SELECT device_id, (ts / :b) * :b AS t, AVG(temp_c) AS temp_c, AVG(rh_pct) AS rh_pct, "
-            "AVG(pres_hpa) AS pres_hpa, COUNT(*) AS n "
+            f"AVG(pres_hpa) AS pres_hpa, COUNT(*) AS n, AVG({pm25}) AS pm25_ugm3 "
             "FROM telemetry WHERE ts >= :start GROUP BY device_id, t ORDER BY device_id, t",
             {"b": bucket, "start": start})
         for r in rows:
             out["devices"].setdefault(r["device_id"], []).append(
-                [r["t"], r["temp_c"], r["rh_pct"], r["pres_hpa"], r["n"]])
+                [r["t"], r["temp_c"], r["rh_pct"], r["pres_hpa"], r["n"], r["pm25_ugm3"]])
     db.close()
     return out
 

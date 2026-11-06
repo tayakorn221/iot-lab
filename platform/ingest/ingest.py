@@ -42,7 +42,10 @@ CREATE TABLE IF NOT EXISTS telemetry (
     temp_c      REAL,
     rh_pct      REAL,
     pres_hpa    REAL,
-    raw         TEXT    NOT NULL
+    raw         TEXT    NOT NULL,
+    pm1_ugm3    REAL,
+    pm25_ugm3   REAL,
+    pm10_ugm3   REAL
 );
 CREATE INDEX IF NOT EXISTS idx_telemetry_device_ts ON telemetry (device_id, ts);
 -- QoS 1 อาจส่งซ้ำ · กันซ้ำเฉพาะแถวที่ใช้เวลาจากบอร์ด (เวลาที่ ingest เติมให้ไม่คงที่ จึงใช้กันซ้ำไม่ได้)
@@ -56,6 +59,9 @@ CREATE TABLE IF NOT EXISTS device_status (
 );
 """
 
+# คอลัมน์ที่เพิ่มทีหลัง — ฐานที่สร้างก่อนหน้าจะไม่มี (CREATE TABLE IF NOT EXISTS ไม่เติมให้)
+ADDED_COLUMNS = {"pm1_ugm3": "REAL", "pm25_ugm3": "REAL", "pm10_ugm3": "REAL"}
+
 log = logging.getLogger("ingest")
 
 
@@ -64,6 +70,12 @@ def open_db(path: Path) -> sqlite3.Connection:
     db = sqlite3.connect(path)
     db.execute("PRAGMA journal_mode=WAL")  # ให้ dashboard อ่านพร้อมกับที่ ingest เขียนได้
     db.executescript(SCHEMA)
+    have = {r[1] for r in db.execute("PRAGMA table_info(telemetry)")}
+    for col, typ in ADDED_COLUMNS.items():
+        if col not in have:
+            db.execute(f"ALTER TABLE telemetry ADD COLUMN {col} {typ}")
+            log.info("เพิ่มคอลัมน์ %s ในฐานเดิม", col)
+    db.commit()
     return db
 
 
@@ -124,16 +136,18 @@ class Ingest:
     def save_telemetry(self, t: Telemetry, received_at: int) -> None:
         cur = self.db.execute(
             "INSERT OR IGNORE INTO telemetry "
-            "(device_id, ts, ts_source, received_at, seq, temp_c, rh_pct, pres_hpa, raw) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (t.device_id, t.ts, t.ts_source, received_at, t.seq, t.temp_c, t.rh_pct, t.pres_hpa, t.raw),
+            "(device_id, ts, ts_source, received_at, seq, temp_c, rh_pct, pres_hpa, "
+            "pm1_ugm3, pm25_ugm3, pm10_ugm3, raw) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (t.device_id, t.ts, t.ts_source, received_at, t.seq, t.temp_c, t.rh_pct, t.pres_hpa,
+             t.pm1_ugm3, t.pm25_ugm3, t.pm10_ugm3, t.raw),
         )
         self.db.commit()
         if cur.rowcount == 0:
             log.debug("ซ้ำ ข้าม: %s seq=%s", t.device_id, t.seq)
             return
         self.check_seq(t.device_id, t.seq)
-        log.debug("%s seq=%s temp=%s rh=%s", t.device_id, t.seq, t.temp_c, t.rh_pct)
+        log.debug("%s seq=%s temp=%s rh=%s pm25=%s", t.device_id, t.seq, t.temp_c, t.rh_pct, t.pm25_ugm3)
 
     def check_seq(self, device_id: str, seq: int) -> None:
         last = self.last_seq.get(device_id)
