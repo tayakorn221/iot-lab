@@ -109,7 +109,8 @@ log: `../../../_work/serial/2026-11-18-node01-v020-kmutt.log`
 
 ### ทำอะไร
 
-1. Docker Desktop ล้มด้วย socket `sailor-ingest.sock` ค้าง (รอบที่ 3) → ปิด Docker → เปลี่ยนชื่อ `%LOCALAPPDATA%\Dockerun` เป็น `run.stale-20261118` **จาก PowerShell ที่เปิดจาก Start menu** → เปิด Docker ใหม่ ขึ้นปกติ
+1. Docker Desktop ล้มด้วย socket `sailor-ingest.sock` ค้าง (รอบที่ 3) → ปิด Docker → เปลี่ยนชื่อ `%LOCALAPPDATA%\Docker
+un` เป็น `run.stale-20261118` **จาก PowerShell ที่เปิดจาก Start menu** → เปิด Docker ใหม่ ขึ้นปกติ
 2. `docker compose -f platform/docker-compose.yml up -d` → บอร์ดต่อ broker เองทันที ไม่ต้องเปิด firewall เพิ่ม (Docker Desktop มีกฎ firewall ของตัวเอง)
 3. รัน `py platform/ingest/ingest.py` และ `py platform/dashboard/app.py --port 8080`
 4. ตรวจ payload ด้วย `docker exec iotlab-broker mosquitto_sub -t "iotlab/#" -v` → `status online` + telemetry ทุก 10 วิ field ครบตาม contract · `ts` เป็นเวลาจริง → ใน SQLite `ts_source = device`
@@ -135,3 +136,19 @@ log: `../../../_work/serial/2026-11-18-node01-v020-kmutt.log`
 ไม่ต้องแตะบอร์ด ไม่ต้องรัน ingest ใหม่ → **ผ่าน**
 
 รูป: `../../../_build/shots/2026-11-18-dashboard-node01-first.png` (dashboard ครั้งแรกที่มีข้อมูลจากบอร์ดจริง · ข้อมูลเข้า 14/14 จุด)
+
+---
+
+## 18 พ.ย. 69 (ต่อ) — เช็กบอร์ดสำรอง → node-02
+
+| บอร์ด | ชิป | MAC | ใช้ทำอะไร |
+|---|---|---|---|
+| node-01 | ESP32-D0WD-V3 rev 3.1 | `d8:bf:c0:97:35:08` | ต่อ BME280 · ตัวหลักด่าน 1 |
+| node-02 | ESP32-D0WD-V3 rev 3.1 | `d8:bf:c0:9b:b0:e0` | บอร์ดสำรอง (ยังไม่ต่อเซนเซอร์) · ด่าน 2 โหนดที่สอง / ด่าน 4 |
+
+- บอร์ดสำรองมาพร้อมเฟิร์มแวร์โรงงาน ESP-AT (ESP-IDF v3.0.3) · แฟลช `pio run -e node-02 -t upload` ผ่าน → เข้า `KMUTT-Secure` → ต่อ broker → `[pub] ok` ทันทีรอบแรก → **บอร์ดดี ไม่ต้องเคลม**
+- **กับดัก:** บอร์ด CP2102 ราคาถูกใช้เลขซีเรียล USB เดียวกัน (`0001`) — สลับบอร์ดแล้ว Windows ให้ COM5 เหมือนเดิม แยกจากเลขพอร์ตไม่ได้ · ก่อนแฟลชให้อ่าน MAC ยืนยันตัวบอร์ดก่อนเสมอ ไม่งั้นแฟลช `node-02` ทับ `node-01` ได้
+  ```bash
+  pio pkg exec -p tool-esptoolpy -- esptool.py --port COM5 read_mac
+  ```
+- พอถอด node-02 การ์ดของมันค้างใน dashboard (สถานะ retained) — ล้างได้ตามวิธี "โหนดผี" ใน `platform/README.md`
