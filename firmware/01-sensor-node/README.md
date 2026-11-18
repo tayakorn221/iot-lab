@@ -2,7 +2,7 @@
 
 ด่าน 1 — ESP32 อ่าน BME280 ทาง I2C แล้วส่งขึ้น MQTT ทุก 10 วินาที ตาม `../../shared/mqtt-contract.md` (v1)
 
-**สถานะ:** `pio run` build ผ่าน (node-01 และ node-02) · **ยังไม่ได้ลองบนบอร์ดจริง** — ทดสอบตามเช็กลิสต์ท้ายไฟล์วันที่ของมาถึง
+**สถานะ:** `pio run` build ผ่าน (node-01 และ node-02) · **ลงบอร์ดจริงแล้ว (node-01, 18 พ.ย. 69):** ส่วนฮาร์ดแวร์และเซนเซอร์ในเช็กลิสต์ข้อ 6 ผ่าน · ส่วนเส้นข้อมูล (Wi-Fi → broker) ยังไม่ได้ทดสอบ — ผลอยู่ใน `../../docs/journal/01-first-line.md`
 
 ## ไฟล์
 
@@ -59,7 +59,8 @@ git check-ignore -v include/secrets.h
 ## 3. แฟลช
 
 ครั้งแรกบน Windows: ลงไดรเวอร์ **CP210x** (Silicon Labs) → เสียบบอร์ดแล้วต้องเห็น `Silicon Labs CP210x ... (COMx)` ใน Device Manager
-ไม่เห็นเลย = สาย USB ชาร์จอย่างเดียว หรือไดรเวอร์ยังไม่ลง
+- ไม่เห็นอะไรใหม่เลย = สาย USB ชาร์จอย่างเดียว
+- เห็น `CP2102 USB to UART Bridge Controller` แต่สถานะ Error (Code 28) = สายถูกแล้ว แค่ยังไม่มีไดรเวอร์ → ลง **CP210x Universal Windows Driver** จาก silabs.com (แตก zip → คลิกขวา `silabser.inf` → Install) แล้วถอดเสียบใหม่
 
 บอร์ดแรก (`node-01`):
 
@@ -68,8 +69,11 @@ pio run -t upload
 ```
 
 ```bash
-pio device monitor
+pio device monitor -b 115200
 ```
+
+- ใส่ `-b 115200` เสมอ — รันนอกโฟลเดอร์นี้ monitor จะไม่อ่าน `platformio.ini` แล้วใช้ 9600 ตัวอักษรออกมาเป็นขยะ
+- **ปิด monitor (Ctrl+C) ก่อน upload ทุกครั้ง** — พอร์ต COM เปิดได้ทีละโปรแกรม ถ้าค้างไว้ upload จะขึ้น `could not open port ... Access is denied`
 
 บอร์ดที่สอง:
 
@@ -93,6 +97,11 @@ log ที่อยากเก็บไว้ดู → บันทึกล�
 serial monitor ขึ้นต้นด้วยแท็ก `[sensor]` `[wifi]` `[mdns]` `[ntp]` `[mqtt]` `[pub]` · บรรทัดแรกบอก `reset reason`
 — ถ้าเห็น `BROWNOUT` แปลว่าไฟเลี้ยงไม่พอ (สาย USB ยาว/บาง หรือที่ชาร์จในรถ)
 
+บรรทัด `[ตัวเลข][E][...]` เป็น log ของไลบรารี core (เปิดด้วย `CORE_DEBUG_LEVEL=1`) ไม่ใช่โค้ดเรา — ที่เห็นเป็นปกติ:
+- `[E][Wire.cpp:499] ... Error -1` — เรียกหาเซนเซอร์แล้วไม่มีใครตอบ · ต่อ BME280 แล้วยังเหลือ 1 บรรทัดตอนบูต (ลอง `0x76` ก่อนเจอที่ `0x77`)
+- `[E][WiFiMulti.cpp:191] ... no matching wifi found!` — Wi-Fi ที่ตั้งไว้ไม่อยู่ในระยะ
+- monitor ขึ้น `#0 0x40080400 in _init at ??:?` ตอนบูต — filter `esp32_exception_decoder` อ่านข้อความบูตของชิปผิดว่าเป็น crash ไม่ใช่ crash จริง
+
 ## 5. พฤติกรรมตอนเน็ตหลุด
 
 - **Wi-Fi หาย:** ตัด MQTT ทิ้งทันที แล้วสแกนหา Wi-Fi ที่รู้จักทุก 5 วิ · ได้ Wi-Fi คืนแล้วต่อ broker ทันทีไม่รอ
@@ -109,13 +118,13 @@ serial monitor ขึ้นต้นด้วยแท็ก `[sensor]` `[wifi]`
 ทำตามลำดับ ข้อก่อนหน้ายังไม่ผ่านอย่าข้าม — พังตรงไหนจะได้รู้ว่าพังที่ชั้นไหน
 
 **ฮาร์ดแวร์ (ยังไม่ต่อ BME280)**
-- [ ] เสียบ USB แล้ว Device Manager เห็น `CP210x (COMx)`
-- [ ] `pio run -t upload` ผ่าน · serial ขึ้นแบนเนอร์ `device_id=node-01` และ `reset reason: power on`
-- [ ] ไฟสีฟ้ากะพริบ (เร็ว = ยังหา Wi-Fi) · serial ขึ้น `[sensor] no BME280` — ถูกแล้ว ยังไม่ได้ต่อ
+- [x] เสียบ USB แล้ว Device Manager เห็น `CP210x (COMx)` — 18 พ.ย. 69 (COM5 หลังลงไดรเวอร์)
+- [x] `pio run -t upload` ผ่าน · serial ขึ้นแบนเนอร์ `device_id=node-01` และ `reset reason: power on` — 18 พ.ย. 69
+- [x] ไฟสีฟ้ากะพริบ (เร็ว = ยังหา Wi-Fi) · serial ขึ้น `[sensor] no BME280` — ถูกแล้ว ยังไม่ได้ต่อ — 18 พ.ย. 69
 
 **เซนเซอร์** (ถอด USB → ต่อ 4 สาย → เสียบใหม่)
-- [ ] serial ขึ้น `chip ID = 0x60` และ `OK: genuine BME280` · ถ้าขึ้นกรอบ `!!! chip ID 0x58` = ได้ BMP280 ปลอม เคลมร้าน
-- [ ] บรรทัด `[pub]` มี `temp_c` ใกล้อุณหภูมิห้อง และ `rh_pct` ไม่ใช่ 0 หรือ 100
+- [x] serial ขึ้น `chip ID = 0x60` และ `OK: genuine BME280` · ถ้าขึ้นกรอบ `!!! chip ID 0x58` = ได้ BMP280 ปลอม เคลมร้าน — 18 พ.ย. 69 (ที่ `0x77`)
+- [x] บรรทัด `[pub]` มี `temp_c` ใกล้อุณหภูมิห้อง และ `rh_pct` ไม่ใช่ 0 หรือ 100 — 18 พ.ย. 69 (27–29 °C · 45–53 %) · จับเซนเซอร์แล้วค่าพุ่งตาม
 
 **เส้นข้อมูล** (รัน broker + ingest + dashboard ตาม `../../platform/README.md`)
 - [ ] serial ขึ้น `[wifi] up` แล้ว `[mqtt] connecting ... (mDNS)` แล้ว `connected` · ไฟติดค้างดับวูบทุก 10 วิ
