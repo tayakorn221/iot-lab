@@ -1,4 +1,4 @@
-// net.h — Wi-Fi หลายชุด (WiFiMulti) + mDNS + เวลา NTP
+// net.h — Wi-Fi หลายชุด (แบบรหัสเดียว + แบบ Enterprise ได้ 1 ชุด) + mDNS + เวลา NTP
 //
 // ไม่มี while วนรอเน็ต — loop() เรียกได้ทุกรอบ:
 //   ต่ออยู่แล้ว → คืนทันที
@@ -13,7 +13,8 @@
 
 namespace net {
 
-void begin(const char* hostname, const WifiNetwork* networks, size_t count);
+// enterprise = nullptr ถ้าไม่มี Wi-Fi แบบล็อกอินด้วยบัญชี
+void begin(const char* hostname, const WifiNetwork* networks, size_t count, const WifiEap* enterprise);
 
 // คืน true ถ้า Wi-Fi ต่ออยู่และได้ IP แล้ว
 bool loop();

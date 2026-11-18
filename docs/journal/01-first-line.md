@@ -69,6 +69,29 @@
 ### ถัดไป (เส้นข้อมูล)
 
 ต้องเคลียร์ฝั่งโน้ตบุ๊กก่อน:
-- Wi-Fi ที่ทำงานน่าจะเป็นแบบล็อกอิน user/pass (ยังไม่ได้ยืนยัน) ซึ่ง ESP32 เข้าไม่ได้ → ให้บอร์ดกับโน้ตบุ๊กเกาะ hotspot มือถือเดียวกัน
+- Wi-Fi ที่ทำงาน `KMUTT-Secure` เป็น WPA2-Enterprise (PEAP) — ชิป ESP32 เข้าได้ แต่เฟิร์มแวร์ v0.1.0 ยังไม่รองรับ → เพิ่มใน v0.2.0 (branch `firmware/wifi-enterprise`) · ทางสำรองคือ hotspot มือถือ
 - Docker Desktop เปิดไม่ขึ้น (socket `sailor-ingest.sock` ค้าง — วิธีแก้ใน `platform/README.md`)
 - Windows Firewall ยังไม่เปิดรับพอร์ต 1883
+
+---
+
+## 18 พ.ย. 69 (ต่อ) — เฟิร์มแวร์ v0.2.0 เข้า KMUTT-Secure
+
+### ทำอะไร
+
+- เพิ่ม WPA2-Enterprise (PEAP) ใน `net.cpp` แทน `WiFiMulti` · ใส่บัญชีใน `secrets.h` (`HAS_WIFI_EAP 1`) · แฟลช node-01
+- ยังไม่ได้ใส่ใบรับรอง CA — serial เตือน `Enterprise server certificate NOT verified` ทุกครั้งที่บูต
+
+### ผล
+
+| ข้อ | ผล |
+|---|---|
+| เข้า Wi-Fi | ✅ `KMUTT-Secure` · RSSI −44 ถึง −47 dBm · ได้ IP ในวงเดียวกับโน้ตบุ๊ก (subnet /22) |
+| ออกเน็ตได้ | ✅ `[ntp] time synced` ภายใน ~10 วิ · `ts` ไม่เป็น 0 แล้ว |
+| mDNS หาโน้ตบุ๊ก | ✅ ชื่อโน้ตบุ๊ก `.local` ได้ IP ตรงกับ IP จริงของโน้ตบุ๊ก |
+| client isolation | ✅ ไม่มี — `ping` จากโน้ตบุ๊กไปบอร์ดได้ 4/4 (107–169 ms) |
+| ต่อ broker | ❌ `[mqtt] connect failed: err -3` — บนโน้ตบุ๊กยังไม่มีอะไรฟังพอร์ต 1883 (Docker ยังเปิดไม่ขึ้น) |
+
+ของที่ดูเหมือนพังแต่ไม่ได้พัง: บรรทัดแรกหลัง `joining "KMUTT-Secure"` ขึ้น `disconnected, reason 202 wrong password?` แล้วบรรทัดถัดมาได้ IP เลย — รอบ EAP แรกโดนปัดแล้ว driver ลองซ้ำเองสำเร็จ · ถ้ารหัสผิดจริงจะไม่มี `got IP` ตามมา
+
+log: `../../../_work/serial/2026-11-18-node01-v020-kmutt.log`

@@ -9,7 +9,7 @@
 #define DEVICE_ID "node-01"
 #endif
 
-#define FW_VERSION "0.1.0"
+#define FW_VERSION "0.2.0"
 
 // ---------- จังหวะ ----------
 constexpr uint32_t PUBLISH_INTERVAL_MS = 10000;  // ROADMAP ด่าน 1: ทุก 10 วินาที
@@ -23,6 +23,7 @@ constexpr int LED_PIN = 2;           // ไฟสีฟ้าบน NodeMCU ESP3
 // ---------- เครือข่าย ----------
 constexpr uint32_t WIFI_RETRY_MS = 5000;        // ห่างกันอย่างน้อยเท่านี้ระหว่างรอบหา Wi-Fi
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 6000;
+constexpr uint32_t WIFI_EAP_CONNECT_TIMEOUT_MS = 15000;  // WPA2-Enterprise คุยกับ RADIUS หลายรอบ ช้ากว่าแบบรหัสเดียวมาก
 constexpr uint32_t MDNS_QUERY_TIMEOUT_MS = 1500;
 constexpr uint32_t MQTT_RETRY_MIN_MS = 2000;     // ต่อ broker ไม่ติด รอ 2 → 4 → 8 → 15 วินาที
 constexpr uint32_t MQTT_RETRY_MAX_MS = 15000;    // เพดานต่ำพอให้ผ่านเกณฑ์ "กลับมาส่งใน 60 วินาที"
@@ -38,6 +39,18 @@ struct WifiNetwork {
   const char* ssid;
   const char* pass;
   const char* broker_ip;  // IP สำรองของ broker ในเครือข่ายนี้ ("" = ไม่มี ใช้ mDNS อย่างเดียว)
+};
+
+// Wi-Fi แบบ WPA2-Enterprise (ล็อกอินด้วยบัญชี) วิธี PEAP/MSCHAPv2 — เช่น Wi-Fi มหาวิทยาลัย
+// identity  = ชื่อด้านนอกที่ส่งก่อนเข้าอุโมงค์เข้ารหัส ("" = ใช้ username)
+// ca_pem    = ใบรับรอง CA ของ RADIUS server · nullptr = ไม่ตรวจว่าคุยกับ server ตัวจริง (ดูคำเตือนใน secrets.example.h)
+struct WifiEap {
+  const char* ssid;
+  const char* identity;
+  const char* username;
+  const char* password;
+  const char* ca_pem;
+  const char* broker_ip;
 };
 
 // ---------- ตรวจ device_id ตาม contract ตอน compile ----------
