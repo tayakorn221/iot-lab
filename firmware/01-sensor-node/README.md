@@ -12,7 +12,7 @@
 | `include/config.h` | ค่าตั้งที่ไม่ลับ: ขา, จังหวะส่ง, เวลา retry |
 | `include/secrets.example.h` | แม่แบบ Wi-Fi/broker — ก๊อปเป็น `secrets.h` |
 | `src/main.cpp` | วงหลัก: ดูแล Wi-Fi → ดูแล MQTT → ครบ 10 วิก็วัดแล้วส่ง → ไฟสถานะ |
-| `src/net.cpp` | Wi-Fi หลายชุด (`WiFiMulti`), mDNS, NTP |
+| `src/net.cpp` | Wi-Fi หลายชุด (สแกนครั้งเดียว เลือกตัวที่รู้จักและแรงสุด · รองรับ WPA2-Enterprise PEAP 1 ชุด), mDNS, NTP |
 | `src/mqtt_link.cpp` | ต่อ broker, Last Will, `online`, ต่อใหม่เองแบบเว้นระยะ |
 | `src/env_sensor.cpp` | BME280 — อ่าน chip ID, แยก BMP280 ปลอม, สายหลุดแล้วหาใหม่เอง |
 | `src/telemetry.cpp` | struct หนึ่งรอบวัด → JSON (field ที่ไม่มีค่าไม่ใส่) |
@@ -36,8 +36,10 @@ git check-ignore -v include/secrets.h
 
 ไม่มี `secrets.h` ก็ยัง build ผ่าน (ใช้ค่าตัวอย่าง พร้อม warning) แต่บอร์ดจะต่อ Wi-Fi ไม่ติด
 
-**Wi-Fi ที่ ESP32 ใช้ไม่ได้:** WPA2-Enterprise (ล็อกอินด้วย user+pass) · captive portal (หน้าเว็บให้กดยอมรับ) · 5 GHz อย่างเดียว
-ที่ทำงานเป็นแบบนี้ → เปิด hotspot มือถือ แล้วให้ทั้งโน้ตบุ๊กและบอร์ดเกาะ hotspot เดียวกัน
+**Wi-Fi แบบล็อกอินด้วยบัญชี (WPA2-Enterprise เช่น `KMUTT-Secure`, `eduroam`):** ใส่ที่ `WIFI_EAP` ใน `secrets.h` แล้วตั้ง `HAS_WIFI_EAP 1` · รองรับเฉพาะ PEAP
+อ่านคำเตือนใน `secrets.example.h` ก่อนใส่บัญชีจริง: รหัสอยู่ใน flash แบบไม่เข้ารหัส · ไม่ใส่ `ca_pem` = ไม่ตรวจใบรับรองของ server · Wi-Fi องค์กรมักกันเครื่องในวงคุยกันเอง (client isolation) บอร์ดอาจต่อ Wi-Fi ติดแต่หา broker บนโน้ตบุ๊กไม่เจอ
+
+**Wi-Fi ที่ใช้ไม่ได้:** captive portal (หน้าเว็บให้กดยอมรับ) · 5 GHz อย่างเดียว → เปิด hotspot มือถือ แล้วให้ทั้งโน้ตบุ๊กและบอร์ดเกาะ hotspot เดียวกัน
 
 **โน้ตบุ๊กต้องให้บอร์ดเข้าถึงได้:** Windows Firewall ต้องเปิดรับพอร์ต 1883 (TCP) และ 5353 (UDP, mDNS) ใน profile ของเครือข่ายนั้น
 ถ้า Windows ตั้งเครือข่ายเป็น "Public" มักโดนบล็อกทั้งคู่ — เปลี่ยนเป็น "Private" สำหรับ Wi-Fi บ้าน/hotspot ตัวเอง
@@ -99,7 +101,7 @@ serial monitor ขึ้นต้นด้วยแท็ก `[sensor]` `[wifi]`
 
 บรรทัด `[ตัวเลข][E][...]` เป็น log ของไลบรารี core (เปิดด้วย `CORE_DEBUG_LEVEL=1`) ไม่ใช่โค้ดเรา — ที่เห็นเป็นปกติ:
 - `[E][Wire.cpp:499] ... Error -1` — เรียกหาเซนเซอร์แล้วไม่มีใครตอบ · ต่อ BME280 แล้วยังเหลือ 1 บรรทัดตอนบูต (ลอง `0x76` ก่อนเจอที่ `0x77`)
-- `[E][WiFiMulti.cpp:191] ... no matching wifi found!` — Wi-Fi ที่ตั้งไว้ไม่อยู่ในระยะ
+- `[wifi] no known network among N in range` — สแกนเจอ N วงแต่ไม่มีวงที่ตั้งไว้ (v0.1.0 ขึ้นเป็น `[E][WiFiMulti.cpp:191] ... no matching wifi found!`)
 - monitor ขึ้น `#0 0x40080400 in _init at ??:?` ตอนบูต — filter `esp32_exception_decoder` อ่านข้อความบูตของชิปผิดว่าเป็น crash ไม่ใช่ crash จริง
 
 ## 5. พฤติกรรมตอนเน็ตหลุด
@@ -110,7 +112,7 @@ serial monitor ขึ้นต้นด้วยแท็ก `[sensor]` `[wifi]`
 - **broker ประกาศ `offline` แทนบอร์ด** ผ่าน Last Will หลังบอร์ดเงียบ ~45 วิ (keepalive 30 วิ × 1.5)
 - **ทางหนีสุดท้าย:** ไม่ได้ต่อ broker นาน 30 นาที → รีบูตตัวเอง (`seq` เริ่มที่ 1 ใหม่) · ตั้งยาวกว่าการทดสอบปิดเราเตอร์ 5 นาทีมาก จะได้ไม่บังบั๊ก
 
-**ข้อจำกัดที่รู้อยู่:** ช่วงไม่มี Wi-Fi `loop()` ติดอยู่ใน `WiFiMulti.run()` ได้ถึง ~8 วิต่อรอบ (สแกน ~2 วิ + รอต่อ 6 วิ)
+**ข้อจำกัดที่รู้อยู่:** ช่วงไม่มี Wi-Fi `loop()` ติดอยู่ใน `connectBest()` ได้ถึง ~8 วิต่อรอบ (สแกน ~2 วิ + รอต่อ 6 วิ) · Wi-Fi แบบ Enterprise รอต่อได้ถึง 15 วิ
 และต่อ broker ไม่ติดค้างได้ ~3–5 วิต่อครั้ง — ไม่กระทบการส่ง เพราะช่วงนั้นไม่มีทางส่งอยู่แล้ว · ด่าน 3 แยกเป็น FreeRTOS task
 
 ## 6. เช็กลิสต์วันของถึง

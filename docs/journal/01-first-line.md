@@ -69,6 +69,6 @@
 ### ถัดไป (เส้นข้อมูล)
 
 ต้องเคลียร์ฝั่งโน้ตบุ๊กก่อน:
-- Wi-Fi ที่ทำงานน่าจะเป็นแบบล็อกอิน user/pass (ยังไม่ได้ยืนยัน) ซึ่ง ESP32 เข้าไม่ได้ → ให้บอร์ดกับโน้ตบุ๊กเกาะ hotspot มือถือเดียวกัน
+- Wi-Fi ที่ทำงาน `KMUTT-Secure` เป็น WPA2-Enterprise (PEAP) — ชิป ESP32 เข้าได้ แต่เฟิร์มแวร์ v0.1.0 ยังไม่รองรับ → เพิ่มใน v0.2.0 (branch `firmware/wifi-enterprise`) · ทางสำรองคือ hotspot มือถือ
 - Docker Desktop เปิดไม่ขึ้น (socket `sailor-ingest.sock` ค้าง — วิธีแก้ใน `platform/README.md`)
 - Windows Firewall ยังไม่เปิดรับพอร์ต 1883

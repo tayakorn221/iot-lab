@@ -105,7 +105,11 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL, I2C_HZ);
   envSensor.begin(Wire);
 
-  net::begin(DEVICE_ID, WIFI_NETWORKS, sizeof(WIFI_NETWORKS) / sizeof(WIFI_NETWORKS[0]));
+#if defined(HAS_WIFI_EAP) && HAS_WIFI_EAP
+  net::begin(DEVICE_ID, WIFI_NETWORKS, sizeof(WIFI_NETWORKS) / sizeof(WIFI_NETWORKS[0]), &WIFI_EAP);
+#else
+  net::begin(DEVICE_ID, WIFI_NETWORKS, sizeof(WIFI_NETWORKS) / sizeof(WIFI_NETWORKS[0]), nullptr);
+#endif
   mqtt_link::begin(DEVICE_ID, TOPIC_STATUS, BROKER_MDNS_HOST, BROKER_PORT);
 
   nextMeasureAt = millis() + 2000;  // ให้เซนเซอร์ตื่นเต็มที่ก่อนวัดครั้งแรก
