@@ -1,7 +1,14 @@
 # ด่าน 1 — เส้นแรกครบเส้น
 
-สถานะ (18 พ.ย. 69): **ส่วนฮาร์ดแวร์ผ่าน** — บอร์ดเปล่า + BME280 อ่านค่าห้องได้จริง
-ส่วนเส้นข้อมูล (Wi-Fi → broker → ingest → dashboard) และเกณฑ์ทนเน็ตหลุดใน `ROADMAP.md` **ยังไม่ได้เริ่ม**
+สถานะ (18 พ.ย. 69): **ส่วนฮาร์ดแวร์ผ่าน · เส้นข้อมูลครบเส้นแล้ว** (บอร์ด → KMUTT-Secure → Mosquitto → ingest → SQLite → dashboard)
+
+| เกณฑ์ด่าน 1 (`ROADMAP.md`) | สถานะ |
+|---|---|
+| payload ตรง `shared/mqtt-contract.md` ทุก field | ✅ 18 พ.ย. 69 |
+| ปิดเราเตอร์ 5 นาที → กลับมาส่งเองใน 60 วิ | ⏳ ปิด AP มหาลัยไม่ได้ — ต้องทดสอบด้วย hotspot มือถือ (ยังไม่ได้ใส่ใน `secrets.h`) |
+| ถอดปลั๊ก broker → ingest ต่อกลับเอง | ✅ 18 พ.ย. 69 |
+| dashboard ย้อนหลัง 24 ชม. ช่องว่างมีแค่ช่วงที่ตั้งใจตัด | ⏳ ต้องรันต่อเนื่อง 24 ชม. |
+| รหัส Wi-Fi ไม่อยู่ในประวัติ git | ⚠️ เกณฑ์เขียนให้ grep SSID แต่ `KMUTT-Secure` (ชื่อสาธารณะ) อยู่ใน commit แล้ว · ที่เป็นความลับคือ username/password — ตรวจทั้งประวัติทุก branch ไม่เจอ · ควรแก้เกณฑ์ใน ROADMAP |
 
 ---
 
@@ -95,3 +102,36 @@
 ของที่ดูเหมือนพังแต่ไม่ได้พัง: บรรทัดแรกหลัง `joining "KMUTT-Secure"` ขึ้น `disconnected, reason 202 wrong password?` แล้วบรรทัดถัดมาได้ IP เลย — รอบ EAP แรกโดนปัดแล้ว driver ลองซ้ำเองสำเร็จ · ถ้ารหัสผิดจริงจะไม่มี `got IP` ตามมา
 
 log: `../../../_work/serial/2026-11-18-node01-v020-kmutt.log`
+
+---
+
+## 18 พ.ย. 69 (ต่อ) — เส้นข้อมูลครบเส้น + ทดสอบดับ broker
+
+### ทำอะไร
+
+1. Docker Desktop ล้มด้วย socket `sailor-ingest.sock` ค้าง (รอบที่ 3) → ปิด Docker → เปลี่ยนชื่อ `%LOCALAPPDATA%\Dockerun` เป็น `run.stale-20261118` **จาก PowerShell ที่เปิดจาก Start menu** → เปิด Docker ใหม่ ขึ้นปกติ
+2. `docker compose -f platform/docker-compose.yml up -d` → บอร์ดต่อ broker เองทันที ไม่ต้องเปิด firewall เพิ่ม (Docker Desktop มีกฎ firewall ของตัวเอง)
+3. รัน `py platform/ingest/ingest.py` และ `py platform/dashboard/app.py --port 8080`
+4. ตรวจ payload ด้วย `docker exec iotlab-broker mosquitto_sub -t "iotlab/#" -v` → `status online` + telemetry ทุก 10 วิ field ครบตาม contract · `ts` เป็นเวลาจริง → ใน SQLite `ts_source = device`
+5. ทดสอบดับ broker: `docker stop iotlab-broker` 31 วิ → `docker start iotlab-broker` แล้วจับเวลาจาก log ของ broker และแถวใหม่ใน SQLite
+
+### พังตรงไหน
+
+| อาการ | สาเหตุจริง | แก้ |
+|---|---|---|
+| ให้ Claude desktop เปลี่ยนชื่อโฟลเดอร์ socket ที่ค้างแทน แต่ Docker ยังล้มเหมือนเดิม (รอบก่อน ๆ) | แอปเป็นแพ็กเกจ MSIX — การเขียนใต้ `%LOCALAPPDATA%` ถูกเบนไป `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\` (เจอโฟลเดอร์ `.stale-*` ค้างในนั้น 3 อัน) · แท็บ Terminal ในแอปก็โดนเหมือนกัน | เปลี่ยนชื่อจาก PowerShell ที่เปิดจาก Start menu เท่านั้น |
+
+### ผล
+
+ทดสอบดับ broker (เกณฑ์ "ถอดปลั๊ก broker แล้วเสียบใหม่ — ingest ต่อกลับเอง ไม่ต้องรันใหม่"):
+
+| เหตุการณ์ | หลัง `docker start` |
+|---|---|
+| ingest ต่อกลับ (session เดิม) | 2 วิ |
+| บอร์ดต่อกลับ + ประกาศ `online` | 10 วิ (เพดาน backoff 15 วิ) |
+| แถวใหม่แถวแรกใน SQLite | 10 วิ |
+| seq ที่หาย | 79–81 (3 ข้อความ = 3 รอบวัดระหว่างดับ 31 วิ) — บอร์ดตั้งใจทิ้งระหว่างหลุด · ingest เตือนเอง `node-01 ขาดไป 3 ข้อความ (seq 78 → 82)` |
+
+ไม่ต้องแตะบอร์ด ไม่ต้องรัน ingest ใหม่ → **ผ่าน**
+
+รูป: `../../../_build/shots/2026-11-18-dashboard-node01-first.png` (dashboard ครั้งแรกที่มีข้อมูลจากบอร์ดจริง · ข้อมูลเข้า 14/14 จุด)
