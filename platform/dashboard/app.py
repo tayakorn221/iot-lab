@@ -1,7 +1,7 @@
 """dashboard — อ่าน SQLite ที่ ingest เขียน แล้วเสิร์ฟหน้าเว็บกราฟ
 
 อ่านอย่างเดียว (เปิดฐานแบบ mode=ro) — dashboard พังหรือปิดไป ข้อมูลไม่เสีย ingest เขียนต่อได้
-หน้าเว็บอยู่ที่ static/index.html (ไฟล์เดียว ไม่พึ่ง CDN วาดกราฟด้วย SVG เอง)
+หน้าเว็บอยู่ที่ static/index.html (ไม่พึ่ง CDN วาดกราฟด้วย SVG เอง · ฟอนต์ OFL อยู่ใน static/fonts)
 
 รัน:  py platform/dashboard/app.py                → http://127.0.0.1:8080
       py platform/dashboard/app.py --db <ไฟล์>    → อ่านฐานอื่น เช่น ฐานตัวอย่างจาก tools/seed-demo.py
@@ -19,6 +19,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_DB = HERE.parent / "data" / "iotlab.sqlite"
@@ -31,6 +32,8 @@ MAX_POINTS = 720  # จุดต่อเส้นต่อกราฟ — ช�
 RANGES_H = (1, 6, 24, 168)
 
 app = FastAPI(title="iot-lab dashboard", docs_url=None, redoc_url=None)
+# ฟอนต์อยู่ในเครื่อง (static/fonts) — หน้าต้องใช้ได้ตอนไม่มีเน็ต ห้ามดึงจาก CDN
+app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
 
 PM_COLS = ("pm1_ugm3", "pm25_ugm3", "pm10_ugm3")

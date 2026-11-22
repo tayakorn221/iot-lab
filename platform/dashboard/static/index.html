@@ -3,156 +3,333 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>iot-lab</title>
+<title>iot-lab · สถานีวัดอากาศ</title>
+<link rel="preload" href="/static/fonts/IBMPlexSansThai-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/static/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  // ตั้งธีมก่อนวาดหน้า กันจอกะพริบ · auto = ตามเครื่อง
+  try { const t = localStorage.getItem("iotlab-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}
+</script>
 <style>
-  /* สีกราฟผ่าน validator ของ dataviz แล้ว (4 ช่องแรก light+dark) · สีเขียว/เหลืองบนพื้นสว่าง < 3:1
-     จึงต้องมีป้ายปลายเส้น + ตาราง (มีทั้งคู่) */
+  /* ฟอนต์ OFL เสิร์ฟจากเครื่อง (static/fonts) — ใช้ได้ตอนไม่มีเน็ต
+     Plex Sans Thai ตัดเหลือไทย + ละติน · JetBrains Mono ใช้กับตัวเลขอย่างเดียว */
+  @font-face { font-family: "Plex Thai"; src: url(/static/fonts/IBMPlexSansThai-Regular.woff) format("woff"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Plex Thai"; src: url(/static/fonts/IBMPlexSansThai-Medium.woff) format("woff"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Plex Thai"; src: url(/static/fonts/IBMPlexSansThai-SemiBold.woff) format("woff"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: "JB Mono"; src: url(/static/fonts/JetBrainsMono-Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+
+  /* สีเส้นโหนด = palette ของ dataviz (ผ่าน validator บนพื้น #fdfdfc และ #16181b)
+     ช่อง 3-4 บนพื้นสว่าง < 3:1 → มีตัวเลขกำกับข้างกราฟ + ตารางเสมอ */
   :root {
     color-scheme: light;
-    --page: #f9f9f7; --surface: #fcfcfb;
-    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
-    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10); --wash: rgba(11,11,11,.045);
+    --page: #f2f3f0; --surface: #fdfdfc; --raised: #f7f8f5;
+    --ink: #121417; --ink-2: #4b5058; --muted: #767b83;
+    --grid: #e7e8e4; --axis: #c8cac5; --line: rgba(18,20,23,.09); --wash: rgba(18,20,23,.045);
     --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
     --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
-    --good: #0ca30c; --warning: #fab219; --critical: #d03b3b;
-    --track: #e9e8e3;
+    --good: #0f8a3c; --warning: #c77700; --critical: #cc3333;
+    --good-bg: rgba(15,138,60,.10); --warning-bg: rgba(237,161,0,.16); --critical-bg: rgba(204,51,51,.10);
+    --shadow: 0 1px 2px rgba(18,20,23,.04), 0 6px 24px -12px rgba(18,20,23,.10);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --page: #0d0d0d; --surface: #1a1a19;
-      --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
-      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --wash: rgba(255,255,255,.05);
+      --page: #0c0d0f; --surface: #16181b; --raised: #1c1f23;
+      --ink: #eceef0; --ink-2: #b3b8bf; --muted: #868b93;
+      --grid: #24272b; --axis: #383c42; --line: rgba(255,255,255,.08); --wash: rgba(255,255,255,.05);
       --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-      --track: #2c2c2a;
+      --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+      --good: #3fbf6a; --warning: #f0b429; --critical: #ef6a6a;
+      --good-bg: rgba(63,191,106,.13); --warning-bg: rgba(240,180,41,.14); --critical-bg: rgba(239,106,106,.13);
+      --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 28px -16px rgba(0,0,0,.6);
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0c0d0f; --surface: #16181b; --raised: #1c1f23;
+    --ink: #eceef0; --ink-2: #b3b8bf; --muted: #868b93;
+    --grid: #24272b; --axis: #383c42; --line: rgba(255,255,255,.08); --wash: rgba(255,255,255,.05);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+    --good: #3fbf6a; --warning: #f0b429; --critical: #ef6a6a;
+    --good-bg: rgba(63,191,106,.13); --warning-bg: rgba(240,180,41,.14); --critical-bg: rgba(239,106,106,.13);
+    --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 28px -16px rgba(0,0,0,.6);
+  }
+
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--page); color: var(--ink);
-    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Leelawadee UI", "Noto Sans Thai", sans-serif;
+    font: 15px/1.6 "Plex Thai", "Leelawadee UI", "Noto Sans Thai", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 16px; }
-  h1 { font-size: 20px; margin: 0; font-weight: 650; }
-  .sub { color: var(--ink-2); font-size: 13px; }
-  .card {
-    background: var(--surface); border: 1px solid var(--ring); border-radius: 12px;
+  .mono { font-family: "JB Mono", ui-monospace, "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  main { max-width: 1240px; margin: 0 auto; padding: 0 24px 56px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 6px; }
+
+  /* ---------- หัวหน้า ---------- */
+  .top { display: flex; align-items: center; gap: 16px; padding: 22px 0 18px; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; margin-right: auto; }
+  .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--ink); display: grid; place-items: center; flex: none; }
+  .mark svg { display: block; }
+  .brand h1 { font-size: 17px; line-height: 1.2; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  .brand p { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
+  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); position: relative; flex: none; }
+  .live.err .dot { background: var(--warning); }
+  .live.idle .dot { background: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) {
+    .live:not(.err):not(.idle) .dot::after {
+      content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--good);
+      opacity: 0; animation: ping 2.4s cubic-bezier(.16,1,.3,1) infinite;
+    }
   }
-  .banner { padding: 14px 16px; margin-bottom: 16px; color: var(--ink-2); }
-  .banner code { background: var(--wash); padding: 1px 6px; border-radius: 4px; }
+  @keyframes ping { 0% { transform: scale(.4); opacity: .7; } 70%, 100% { transform: scale(1.4); opacity: 0; } }
+  .theme {
+    display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 13px; cursor: pointer;
+  }
+  .theme:hover { color: var(--ink); }
 
-  /* --- การ์ดโหนด --- */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 16px; }
-  .tile { padding: 14px 16px; }
-  .tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-  .dev { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
-  .dev span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .key { width: 14px; height: 3px; border-radius: 2px; flex: none; }
-  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
-  .pill svg { flex: none; }
-  .hero { font-size: 32px; font-weight: 600; line-height: 1.15; }
-  .hero small { font-size: 16px; font-weight: 500; color: var(--ink-2); margin-left: 2px; }
-  .minor { display: flex; gap: 16px; color: var(--ink-2); font-size: 14px; margin-top: 2px; }
-  .pm { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; color: var(--ink-2); }
-  .pm b { color: var(--ink); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .seen { color: var(--muted); font-size: 13px; margin-top: 8px; }
-  .reflabel { fill: var(--ink-2); font-size: 11px; }
-  .meter { margin-top: 10px; }
-  .meter-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
-  .meter-track { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
-  .meter-fill { height: 100%; border-radius: 3px; }
+  /* ---------- แถบสรุป ---------- */
+  .summary { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 2fr); margin-bottom: 16px; overflow: hidden; }
+  .verdict { padding: 20px 22px; display: flex; gap: 14px; align-items: flex-start; border-right: 1px solid var(--line); }
+  .verdict .ic { flex: none; margin-top: 3px; }
+  .verdict strong { display: block; font-size: 21px; line-height: 1.35; font-weight: 600; letter-spacing: -0.01em; }
+  .verdict p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+  .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+  .fact { padding: 18px 20px; border-right: 1px solid var(--line); min-width: 0; }
+  .fact:last-child { border-right: 0; }
+  .fact dt { font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .fact dd { margin: 6px 0 0; }
+  .fact .big { font-size: 28px; line-height: 1.15; font-weight: 500; letter-spacing: -0.02em; font-feature-settings: "tnum"; }
+  .fact .big small { font-family: "Plex Thai", sans-serif; font-size: 14px; color: var(--ink-2); margin-left: 3px; letter-spacing: 0; }
+  .fact .note { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
 
-  /* --- แถบตัวกรอง --- */
-  .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 10px; }
-  .seg { display: inline-flex; background: var(--wash); border-radius: 8px; padding: 2px; }
+  /* ---------- การ์ดโหนด ---------- */
+  .nodes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .node { container-type: inline-size; position: relative; overflow: hidden; }
+  .node::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); }
+  .node-in { padding: 16px 20px 18px 22px; }
+  .node-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .node-name { font-weight: 600; font-size: 15px; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .node-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .node-name small { font-weight: 400; color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 8px; border-radius: 999px;
+    font-size: 13px; line-height: 1.6; white-space: nowrap; color: var(--ink); background: var(--wash);
+  }
+  .chip.good { background: var(--good-bg); } .chip.warning { background: var(--warning-bg); } .chip.critical { background: var(--critical-bg); }
+  .node-body { display: grid; gap: 14px; margin-top: 14px; }
+  .hero { display: flex; align-items: baseline; gap: 6px; }
+  .hero .v { font-size: 48px; line-height: 1; font-weight: 500; letter-spacing: -0.03em; font-feature-settings: "tnum"; }
+  .hero .u { font-size: 18px; color: var(--ink-2); }
+  .hero .l { font-size: 13px; color: var(--muted); margin-left: 6px; }
+  .reads { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 12px 16px; margin: 0; }
+  .reads div { min-width: 0; }
+  .reads dt { font-size: 12.5px; color: var(--muted); line-height: 1.4; white-space: nowrap; }
+  .reads dd { margin: 3px 0 0; font-size: 17px; line-height: 1.3; white-space: nowrap; }
+  .reads dd small { font-family: "Plex Thai", sans-serif; font-size: 12.5px; color: var(--ink-2); margin-left: 3px; letter-spacing: 0; }
+  .reads .lv { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-2); margin-top: 2px; white-space: nowrap; }
+  .node-foot { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+  .cov-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .cov-top b { font-weight: 400; color: var(--ink); font-size: 14px; }
+  .cov-top .of { color: var(--muted); }
+  .meter { position: relative; height: 6px; border-radius: 3px; background: var(--wash); }
+  .meter i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+  .meter .goal { position: absolute; left: 95%; top: -4px; bottom: -4px; width: 2px; border-radius: 1px; background: var(--ink-2); }
+  .seen { font-size: 13px; color: var(--muted); }
+  .nosensor { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: var(--warning-bg); font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+  .nosensor svg { flex: none; margin-top: 3px; }
+  .nosensor b { display: block; color: var(--ink); font-weight: 600; }
+  @container (min-width: 560px) {
+    .node-body { grid-template-columns: auto 1fr; align-items: center; gap: 32px; }
+    .node-body .reads { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  }
+
+  /* ---------- กราฟย้อนหลัง ---------- */
+  .scope { padding: 6px 0 10px; }
+  .scope-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 12px 20px 10px; }
+  .scope-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .seg { display: inline-flex; background: var(--wash); border-radius: 9px; padding: 3px; }
   .seg button {
-    font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--ink-2);
-    padding: 5px 12px; border-radius: 6px; cursor: pointer; min-height: 32px;
+    border: 0; background: transparent; color: var(--ink-2); font-size: 13.5px; line-height: 1.4;
+    padding: 5px 12px; border-radius: 7px; cursor: pointer; min-height: 32px; white-space: nowrap;
   }
-  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--ring); }
-  .seg button:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); font-weight: 500; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); margin-left: auto; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
-
-  /* --- กราฟ --- */
-  .panel { padding: 12px 8px 6px 4px; margin-bottom: 12px; position: relative; }
-  .panel h2 { font-size: 14px; font-weight: 600; margin: 0 0 4px 12px; }
-  .panel h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
-  svg.chart { display: block; width: 100%; overflow: visible; touch-action: pan-y; }
-  .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-  .endlabel { fill: var(--ink-2); font-size: 12px; }
-  .empty { fill: var(--muted); font-size: 13px; }
-  .tooltip {
-    position: fixed; pointer-events: none; z-index: 10; display: none;
-    background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 8px 10px; font-size: 13px; min-width: 150px;
+  .key { width: 14px; height: 3px; border-radius: 2px; flex: none; display: inline-block; }
+  .fit {
+    flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+    font-size: 13px; color: var(--ink-2); background: var(--wash); border-radius: 9px; padding: 7px 12px;
   }
-  .tooltip .t { color: var(--ink-2); margin-bottom: 4px; }
-  .tooltip .row { display: flex; align-items: center; gap: 8px; }
-  .tooltip .row b { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .tooltip .na { color: var(--muted); font-weight: 400; }
+  .fit button { border: 0; background: none; padding: 0; color: var(--s1); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+  .fit:empty { display: none; }
+  .link { border: 0; background: none; padding: 0; color: var(--s1); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: inherit; }
 
-  details { margin-top: 8px; }
-  summary { cursor: pointer; color: var(--ink-2); font-size: 14px; padding: 6px 0; }
-  .tablewrap { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
-  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  .rows { border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: 216px minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+  .gut { padding: 12px 16px 12px 20px; border-right: 1px solid var(--line); min-width: 0; }
+  .gut h3 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; }
+  .gut h3 small { font-weight: 400; color: var(--muted); margin-left: 6px; font-size: 12.5px; }
+  .when { font-size: 12px; color: var(--muted); margin-top: 1px; min-height: 19px; }
+  .when.on { color: var(--ink); }
+  .vals { display: grid; gap: 2px; margin-top: 6px; }
+  .val { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .val .key { align-self: center; }
+  .val .id { font-size: 12.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .val .n { margin-left: auto; font-size: 15px; white-space: nowrap; }
+  .val.solo .n { margin-left: 0; font-size: 24px; line-height: 1.2; }
+  .val .n small { font-family: "Plex Thai", sans-serif; font-size: 12px; color: var(--ink-2); margin-left: 3px; letter-spacing: 0; }
+  .val .na { font-family: "Plex Thai", sans-serif; font-size: 12.5px; color: var(--muted); letter-spacing: 0; }
+  .val.lane { flex-wrap: wrap; row-gap: 0; }
+  .val.lane .n { flex-basis: 100%; margin-left: 22px; }
+  .span { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .plot { display: block; width: 100%; touch-action: pan-y; cursor: crosshair; }
+  .row.note { grid-template-columns: 1fr; }
+  .row.note p { margin: 0; padding: 11px 20px; font-size: 13.5px; color: var(--ink-2); }
+  .row.note b { font-weight: 600; color: var(--ink); margin-right: 8px; }
+  .axis-row { display: grid; grid-template-columns: 216px minmax(0, 1fr); }
+  .axis-row .gut { border-right: 0; padding-top: 4px; padding-bottom: 0; font-size: 12px; color: var(--muted); }
+
+  svg text { font-family: "JB Mono", ui-monospace, monospace; }
+  .tick { fill: var(--muted); font-size: 11px; }
+  .tick.th, .gaplabel, .reflabel { font-family: "Plex Thai", sans-serif; }
+  .reflabel { fill: var(--critical); font-size: 11.5px; }
+  .gaplabel { fill: var(--critical); font-size: 11.5px; }
+  .lanelabel { fill: var(--ink-2); font-size: 11.5px; font-family: "Plex Thai", sans-serif; }
+
+  /* ---------- ตาราง ---------- */
+  details.card { margin-top: 16px; }
+  summary { cursor: pointer; padding: 14px 20px; font-size: 14px; font-weight: 500; list-style: none; display: flex; align-items: center; gap: 10px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: ""; width: 7px; height: 7px; border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2); transform: rotate(-45deg); transition: transform .2s; }
+  details[open] summary::before { transform: rotate(45deg); }
+  summary small { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .tablewrap { overflow-x: auto; border-top: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: right; padding: 7px 16px; white-space: nowrap; }
+  td { border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12.5px; background: var(--raised); }
   th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
-  th { color: var(--ink-2); font-weight: 600; }
+  th:first-child, td:first-child { padding-left: 20px; }
+  td.mono { font-size: 12.5px; }
+
+  .banner { padding: 18px 22px; margin-bottom: 16px; color: var(--ink-2); }
+  .banner strong { display: block; color: var(--ink); font-size: 16px; margin-bottom: 4px; }
+  .banner code { font-family: "JB Mono", ui-monospace, monospace; font-size: 12.5px; background: var(--wash); padding: 1px 6px; border-radius: 5px; word-break: break-all; }
+  .foot { margin-top: 20px; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .foot code { font-family: "JB Mono", ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+
+  /* โครงรอโหลด */
+  .skel { background: var(--wash); border-radius: 8px; }
+  @media (prefers-reduced-motion: no-preference) { .skel { animation: breathe 1.6s ease-in-out infinite; } }
+  @keyframes breathe { 50% { opacity: .5; } }
+
+  /* ---------- จอแคบ ---------- */
+  @media (max-width: 900px) {
+    .summary { grid-template-columns: 1fr; }
+    .verdict { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+  @media (max-width: 720px) {
+    main { padding: 0 16px 40px; }
+    .top { padding: 16px 0 14px; gap: 8px 10px; flex-wrap: wrap; }
+    .brand { flex: 1 1 0; }
+    .brand p { font-size: 12.5px; }
+    .theme { width: 34px; padding: 0; justify-content: center; }
+    .theme .tl { display: none; }
+    .live { order: 3; flex-basis: 100%; }
+    .facts { grid-template-columns: 1fr; }
+    .fact { border-right: 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 12px; padding: 12px 18px; }
+    .fact:last-child { border-bottom: 0; }
+    .fact dd { display: contents; }
+    .fact .big { grid-column: 2; grid-row: 1; font-size: 21px; }
+    .fact .note { grid-column: 1 / -1; margin-top: 4px; }
+    .verdict { padding: 16px 18px; }
+    .verdict strong { font-size: 18px; }
+    .row, .axis-row { grid-template-columns: 1fr; }
+    .gut { border-right: 0; padding: 10px 16px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: start; }
+    .gut h3 { grid-column: 1; }
+    .gut .when { grid-column: 1; grid-row: 2; }
+    .gut .vals { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; justify-items: end; }
+    .gut .span { grid-column: 1; grid-row: 3; margin-top: 0; }
+    .val.solo .n { font-size: 20px; }
+    .axis-row .gut { display: none; }
+    .scope-head { padding: 12px 16px 10px; }
+    .legend { margin-left: 0; flex-basis: 100%; }
+    .row.note p { padding: 10px 16px; }
+    .node-in { padding: 14px 16px 16px 18px; }
+    .hero .v { font-size: 40px; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>iot-lab</h1>
-    <span class="sub" id="updated">กำลังโหลด…</span>
-  </header>
-  <div id="banner"></div>
-  <section class="tiles" id="tiles" aria-label="สถานะโหนด"></section>
-
-  <div class="toolbar">
-    <div class="seg" role="group" aria-label="ช่วงเวลา" id="ranges">
-      <button data-h="1">1 ชม.</button><button data-h="6">6 ชม.</button>
-      <button data-h="24">24 ชม.</button><button data-h="168">7 วัน</button>
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 12.5h3l2-6 3.5 9 2.2-5.5H16" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div><h1>iot-lab</h1><p>สถานีวัดอากาศ · อุณหภูมิ ความชื้น ความกด ฝุ่น</p></div>
     </div>
-    <div class="legend" id="legend" aria-label="คำอธิบายสีเส้น"></div>
-  </div>
+    <div class="live idle" id="live" role="status"><i class="dot"></i><span id="updated">กำลังโหลด…</span></div>
+    <button class="theme" id="theme" type="button"></button>
+  </header>
 
-  <section class="card panel">
-    <h2>ข้อมูลเข้า<small>ช่องว่าง = ไม่มีข้อมูลเข้ามาช่วงนั้น</small></h2>
-    <svg class="chart" id="c-avail" role="img"></svg>
+  <div id="banner"></div>
+  <section class="card summary" id="summary" aria-label="สรุปสถานะ">
+    <div class="verdict"><div class="skel" style="width:70%;height:52px"></div></div>
+    <div class="facts"><div class="fact"><div class="skel" style="height:48px"></div></div><div class="fact"><div class="skel" style="height:48px"></div></div><div class="fact"><div class="skel" style="height:48px"></div></div></div>
   </section>
-  <section class="card panel"><h2>ฝุ่น PM2.5<small>µg/m³ · เส้นประ = มาตรฐานไทย 37.5 (เทียบค่าเฉลี่ย 24 ชม.)</small></h2><svg class="chart" id="c-pm25" role="img"></svg></section>
-  <section class="card panel"><h2>อุณหภูมิ<small>°C</small></h2><svg class="chart" id="c-temp" role="img"></svg></section>
-  <section class="card panel"><h2>ความชื้นสัมพัทธ์<small>%RH</small></h2><svg class="chart" id="c-rh" role="img"></svg></section>
-  <section class="card panel"><h2>ความกดอากาศ<small>hPa</small></h2><svg class="chart" id="c-pres" role="img"></svg></section>
+  <section class="nodes" id="nodes" aria-label="โหนด"><div class="card skel" style="height:200px"></div></section>
 
-  <details id="tabledetails">
-    <summary>ดูเป็นตาราง (40 ช่วงเวลาล่าสุด)</summary>
+  <section class="card scope" aria-label="ข้อมูลย้อนหลัง">
+    <div class="scope-head">
+      <h2>ย้อนหลัง</h2>
+      <div class="seg" role="group" aria-label="ช่วงเวลา" id="ranges">
+        <button type="button" data-h="1">1 ชม.</button><button type="button" data-h="6">6 ชม.</button>
+        <button type="button" data-h="24">24 ชม.</button><button type="button" data-h="168">7 วัน</button>
+      </div>
+      <div class="legend" id="legend" aria-label="สีของแต่ละโหนด"></div>
+      <div class="fit" id="fit"></div>
+    </div>
+    <div class="rows" id="rows"></div>
+    <div class="axis-row"><div class="gut" id="axisnote"></div><svg class="plot" id="axis" aria-hidden="true"></svg></div>
+  </section>
+
+  <details class="card" id="tabledetails">
+    <summary>ดูเป็นตาราง <small>40 ช่วงเวลาล่าสุด</small></summary>
     <div class="tablewrap"><table id="table"></table></div>
   </details>
+
+  <footer class="foot" id="foot"></footer>
 </main>
-<div class="tooltip" id="tip" role="status"></div>
 
 <script>
 "use strict";
 const REFRESH_MS = 10000;
 const SLOTS = 8;
+const RANGES = [1, 6, 24, 168];
 // idx = ตำแหน่งในจุดของ /api/series: [t, temp, rh, pres, n, pm25]
+// minSpan = ช่วงแกน y ขั้นต่ำ — ค่านิ่ง ๆ จะได้ไม่ถูกขยายจนแกนขึ้นทศนิยม 3 ตำแหน่ง
 const METRICS = [
-  { id: "c-pm25", idx: 5, name: "PM2.5", unit: "µg/m³", dp: 0, zero: true, ref: { v: 37.5, label: "37.5" } },
-  { id: "c-temp", idx: 1, name: "อุณหภูมิ", unit: "°C", dp: 1 },
-  { id: "c-rh",   idx: 2, name: "ความชื้น", unit: "%",  dp: 1 },
-  { id: "c-pres", idx: 3, name: "ความกด",  unit: "hPa", dp: 1 },
+  { key: "pm25", idx: 5, name: "ฝุ่น PM2.5", unit: "µg/m³", dp: 0, minSpan: 20, zero: true, ref: 37.5 },
+  { key: "temp", idx: 1, name: "อุณหภูมิ", unit: "°C", dp: 1, minSpan: 2 },
+  { key: "rh",   idx: 2, name: "ความชื้นสัมพัทธ์", unit: "%", dp: 1, minSpan: 6 },
+  { key: "pres", idx: 3, name: "ความกดอากาศ", unit: "hPa", dp: 1, minSpan: 2 },
 ];
-const M = { top: 8, right: 76, bottom: 24, left: 48 };
-const CHART_H = 170;
+const M = { top: 12, right: 16, bottom: 10, left: 52 };
 
 let hours = 24;
 try { hours = +localStorage.getItem("iotlab-hours") || 24; } catch (_) {}
-let overview = null, series = null, hoverT = null;
+if (!RANGES.includes(hours)) hours = 24;
+let overview = null, series = null, hoverT = null, failing = false;
+let dom = null;            // ช่วงเวลาที่วาดจริง (อาจแคบกว่าที่ขอ ถ้าข้อมูลเพิ่งเริ่ม)
+const rowCtx = [];         // ข้อมูลของแต่ละแถวกราฟ ไว้ใช้ตอน hover
 
 const $ = (s) => document.querySelector(s);
 const NS = "http://www.w3.org/2000/svg";
@@ -166,21 +343,29 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 // สีตามตัวโหนด ไม่ใช่ตามลำดับที่โผล่ในกราฟ — เรียงจาก device_id ทั้งหมดที่ระบบรู้จัก
 function colorOf(dev) {
-  const ids = (overview?.devices || []).map((d) => d.device_id);
-  const i = ids.indexOf(dev);
+  const i = (overview?.devices || []).findIndex((d) => d.device_id === dev);
   return i >= 0 && i < SLOTS ? `var(--s${i + 1})` : "var(--muted)";
 }
 
+// ---------- รูปแบบตัวเลข/เวลา ----------
 const fmtTime = (t) => new Date(t * 1000).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
 const fmtTimeS = (t) => new Date(t * 1000).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 const fmtDate = (t) => new Date(t * 1000).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
-const fmtNum = (v, dp) => (v == null ? "–" : v.toLocaleString("th-TH", { minimumFractionDigits: dp, maximumFractionDigits: dp }));
-function fmtAge(s) {
+const fmtNum = (v, dp) => (v == null ? "-" : v.toLocaleString("th-TH", { minimumFractionDigits: dp, maximumFractionDigits: dp }));
+const fmtInt = (v) => v.toLocaleString("th-TH");
+function fmtDur(s) {
+  s = Math.max(0, Math.round(s));
   if (s < 60) return `${s} วินาที`;
-  if (s < 3600) return `${Math.floor(s / 60)} นาที`;
-  if (s < 86400) return `${Math.floor(s / 3600)} ชม. ${Math.floor((s % 3600) / 60)} นาที`;
-  return `${Math.floor(s / 86400)} วัน`;
+  if (s < 3600) return `${Math.round(s / 60)} นาที`;
+  if (s < 86400) { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return m ? `${h} ชม. ${m} นาที` : `${h} ชม.`; }
+  const d = Math.floor(s / 86400), h = Math.round((s % 86400) / 3600);
+  return h ? `${d} วัน ${h} ชม.` : `${d} วัน`;
 }
+const tzOff = () => -new Date().getTimezoneOffset() * 60;
+// วันนี้แสดงแค่เวลา · ข้ามวันแล้วต้องมีวันที่ ไม่งั้น "ตั้งแต่ 18:27" อ่านผิดได้
+const sameDay = (a, b) => Math.floor((a + tzOff()) / 86400) === Math.floor((b + tzOff()) / 86400);
+const fmtWhen = (t) => (sameDay(t, overview.now) ? fmtTime(t) : `${fmtDate(t)} ${fmtTime(t)}`);
+
 // ระดับคุณภาพอากาศ PM2.5 ของกรมควบคุมมลพิษ (เกณฑ์ปี 2566) — เกณฑ์จริงใช้ค่าเฉลี่ย 24 ชม.
 // ค่าบนการ์ดเป็นค่าขณะนั้น จึงใช้บอกแนวโน้ม ไม่ใช่ประกาศระดับอย่างเป็นทางการ
 const PM_LEVELS = [
@@ -191,80 +376,153 @@ const PM_LEVELS = [
   { max: Infinity, text: "มีผลต่อสุขภาพ", kind: "critical" },
 ];
 const pmLevel = (v) => PM_LEVELS.find((l) => v <= l.max);
-const tzOff = () => -new Date().getTimezoneOffset() * 60;
-// วันนี้แสดงแค่เวลา · ข้ามวันแล้วต้องมีวันที่ ไม่งั้น "ตั้งแต่ 18:27" อ่านผิดได้
-const sameDay = (a, b) => Math.floor((a + tzOff()) / 86400) === Math.floor((b + tzOff()) / 86400);
-const fmtWhen = (t) => (sameDay(t, overview.now) ? fmtTime(t) : `${fmtDate(t)} ${fmtTime(t)}`);
+
+// ไอคอนสถานะ: สี + รูปทรงต่างกัน ไม่พึ่งสีอย่างเดียว
+const ICON = {
+  good: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--good)"/><path d="M4.2 7.2l1.9 1.9 3.8-4.1" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  warning: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.2l6.1 11H.9z" fill="var(--warning)" stroke="var(--warning)" stroke-width="1" stroke-linejoin="round"/><path d="M7 5.2v3" stroke="#111" stroke-width="1.6" stroke-linecap="round"/><circle cx="7" cy="10.2" r=".9" fill="#111"/></svg>`,
+  critical: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="var(--critical)"/><path d="M4.6 4.6l4.8 4.8M9.4 4.6l-4.8 4.8" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  unknown: (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="var(--muted)" stroke-width="1.6"/></svg>`,
+};
 
 // ---------- โหลดข้อมูล ----------
 async function load() {
   try {
     const [o, s] = await Promise.all([
-      fetch("/api/overview").then((r) => r.json()),
-      fetch(`/api/series?hours=${hours}`).then((r) => r.json()),
+      fetch("/api/overview").then((r) => { if (!r.ok) throw r; return r.json(); }),
+      fetch(`/api/series?hours=${hours}`).then((r) => { if (!r.ok) throw r; return r.json(); }),
     ]);
-    overview = o; series = s;
+    overview = o; series = s; failing = false;
     render();
-    $("#updated").textContent = `อัปเดตทุก 10 วินาที · ล่าสุด ${fmtTimeS(o.now)}`;
   } catch (e) {
-    $("#updated").textContent = "ต่อ dashboard ไม่ได้ — server ยังรันอยู่ไหม";
+    failing = true;
+    renderLive();
   }
 }
 
 function render() {
-  renderBanner(); renderTiles(); renderLegend(); renderCharts(); renderTable();
+  renderLive(); renderBanner(); renderSummary(); renderNodes(); renderLegend(); renderScope(); renderTable(); renderFoot();
+}
+
+function renderLive() {
+  const live = $("#live");
+  live.classList.toggle("err", failing);
+  live.classList.toggle("idle", !overview);
+  if (failing) $("#updated").textContent = overview
+    ? `ต่อ server ไม่ได้ · ค้างที่ข้อมูล ${fmtTimeS(overview.now)}`
+    : "ต่อ server ไม่ได้ · ลองใหม่ทุก 10 วินาที";
+  else if (overview) $("#updated").innerHTML = `อัปเดตทุก 10 วินาที · <span class="mono">${fmtTimeS(overview.now)}</span>`;
 }
 
 function renderBanner() {
   const b = $("#banner");
   if (!overview.db_found) {
-    b.innerHTML = `<div class="card banner">ยังไม่มีฐานข้อมูลที่ <code>${esc(overview.db)}</code> — เปิด ingest ก่อน แล้วรอข้อความแรกเข้ามา</div>`;
+    b.innerHTML = `<div class="card banner"><strong>ยังไม่มีฐานข้อมูล</strong>เปิด ingest ก่อน แล้วรอข้อความแรกเข้ามา · ไฟล์ที่ตามหา <code>${esc(overview.db)}</code></div>`;
   } else if (!overview.devices.length) {
-    b.innerHTML = `<div class="card banner">ฐานข้อมูลยังว่าง — ยังไม่มีโหนดส่งข้อมูลเข้ามา ลองรัน <code>py tools/fake-node.py</code></div>`;
+    b.innerHTML = `<div class="card banner"><strong>ฐานข้อมูลยังว่าง</strong>ยังไม่มีโหนดส่งข้อมูลเข้ามา · ลองรัน <code>py tools/fake-node.py</code> เพื่อดูหน้าตาก่อนต่อบอร์ดจริง</div>`;
   } else b.innerHTML = "";
 }
 
-// ---------- การ์ดโหนด ----------
-const ICON = {
-  good: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="var(--good)"/><path d="M3.5 6.2l1.7 1.7 3.3-3.6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  warning: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1l5.2 9.5H.8z" fill="var(--warning)"/><path d="M6 4.6v2.6" stroke="#0b0b0b" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="8.8" r=".8" fill="#0b0b0b"/></svg>',
-  critical: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill="var(--critical)"/><path d="M4 4l4 4M8 4l-4 4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>',
-  unknown: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--muted)" stroke-width="1.5"/></svg>',
-};
-
+// ---------- สถานะโหนด ----------
 function statusOf(d) {
   const age = d.last ? overview.now - d.last.ts : null;
-  if (d.status === "offline") return { kind: "critical", text: `ออฟไลน์ ตั้งแต่ ${fmtWhen(d.status_since)}` };
-  if (d.status === "online" && age != null && age > overview.stale_s) return { kind: "warning", text: `เงียบไป ${fmtAge(age)}` };
-  if (d.status === "online") return { kind: "good", text: "ออนไลน์" };
-  return { kind: "unknown", text: "ไม่ทราบสถานะ" };
+  if (d.status === "offline") return { kind: "critical", text: "ออฟไลน์", long: `ออฟไลน์ตั้งแต่ ${fmtWhen(d.status_since)}` };
+  if (d.status === "online" && age != null && age > overview.stale_s) return { kind: "warning", text: `เงียบ ${fmtDur(age)}`, long: `ออนไลน์แต่ไม่มีข้อมูลเข้า ${fmtDur(age)}` };
+  if (d.status === "online") return { kind: "good", text: "ออนไลน์", long: "ออนไลน์" };
+  return { kind: "unknown", text: "ไม่ทราบสถานะ", long: "ไม่ทราบสถานะ" };
 }
 
-function renderTiles() {
-  $("#tiles").innerHTML = overview.devices.map((d) => {
+function renderSummary() {
+  const box = $("#summary");
+  const devs = overview.devices;
+  if (!devs.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const st = devs.map((d) => ({ d, s: statusOf(d) }));
+  const ok = st.filter((x) => x.s.kind === "good");
+  const bad = st.filter((x) => x.s.kind !== "good");
+  let icon, head, sub;
+  if (!bad.length) {
+    icon = ICON.good(22);
+    head = devs.length === 1 ? `${devs[0].device_id} ทำงานปกติ` : `ทั้ง ${devs.length} โหนดทำงานปกติ`;
+    sub = "ทุกโหนดส่งข้อมูลเข้ามาตามรอบ";
+  } else {
+    const worst = bad.find((x) => x.s.kind === "critical") || bad[0];
+    icon = ICON[worst.s.kind](22);
+    head = bad.length === 1 ? `${worst.d.device_id} ${worst.s.long}` : `${bad.length} โหนดมีปัญหา`;
+    sub = `ออนไลน์ ${ok.length} จาก ${devs.length} โหนด` + (bad.length > 1 ? ` · ${bad.map((x) => `${x.d.device_id} ${x.s.text}`).join(", ")}` : "");
+  }
+  // ข้อมูลครบ: ใช้โหนดที่แย่สุด — เกณฑ์ด่าน 2 คือทุกโหนด ≥ 95%
+  const covs = devs.filter((d) => d.coverage_24h != null);
+  const worstCov = covs.length ? covs.reduce((a, b) => (b.coverage_24h < a.coverage_24h ? b : a)) : null;
+  const covOk = worstCov && worstCov.coverage_24h >= 0.95;
+  const received = devs.reduce((a, d) => a + (d.received_24h || 0), 0);
+  const pms = devs.filter((d) => d.pm_last);
+  const pmTop = pms.length ? pms.reduce((a, b) => (b.pm_last.pm25_ugm3 > a.pm_last.pm25_ugm3 ? b : a)) : null;
+  const lv = pmTop && pmLevel(pmTop.pm_last.pm25_ugm3);
+  const pmAge = pmTop ? overview.now - pmTop.pm_last.ts : 0;
+
+  box.innerHTML = `
+    <div class="verdict"><span class="ic">${icon}</span><div><strong>${esc(head)}</strong><p>${esc(sub)}</p></div></div>
+    <dl class="facts">
+      <div class="fact"><dt>ข้อมูลครบใน 24 ชม.</dt><dd>
+        ${worstCov ? `<div class="big">${fmtNum(worstCov.coverage_24h * 100, 1)}<small>%</small></div>
+        <div class="note">${ICON[covOk ? "good" : "warning"](12)}${covOk ? "ผ่านเกณฑ์ ≥ 95%" : "ต่ำกว่าเกณฑ์ 95%"}${covs.length > 1 ? ` · น้อยสุด ${esc(worstCov.device_id)}` : ""}</div>` : `<div class="note">ยังไม่มีข้อมูล</div>`}
+      </dd></div>
+      <div class="fact"><dt>ข้อความเข้าใน 24 ชม.</dt><dd>
+        <div class="big">${fmtInt(received)}</div>
+        <div class="note">รอบส่งที่คาด ทุก ${overview.interval_s} วินาที</div>
+      </dd></div>
+      <div class="fact"><dt>ฝุ่น PM2.5 ล่าสุด${pms.length > 1 ? " (สูงสุด)" : ""}</dt><dd>
+        ${pmTop ? `<div class="big">${fmtNum(pmTop.pm_last.pm25_ugm3, 0)}<small>µg/m³</small></div>
+        <div class="note">${ICON[lv.kind](12)}${lv.text}${pms.length > 1 ? ` · ${esc(pmTop.device_id)}` : ""}</div>${pmAge > overview.stale_s ? `<div class="note" style="color:var(--muted)">วัดเมื่อ ${fmtDur(pmAge)} ที่แล้ว</div>` : ""}`
+        : `<div class="big" style="font-size:16px;line-height:1.5;color:var(--ink-2)">ยังไม่มีเซนเซอร์ฝุ่น</div><div class="note">ยังไม่มีโหนดที่ส่งค่าฝุ่น</div>`}
+      </dd></div>
+    </dl>`;
+}
+
+// field สุขภาพบอร์ด (ถ้า ingest ส่งมาในอนาคต) — ไม่มีก็ไม่แสดง
+const HEALTH = [
+  { k: "rssi_dbm", name: "สัญญาณ Wi-Fi", fmt: (v) => `${fmtNum(v, 0)}<small>dBm</small>` },
+  { k: "heap_free", name: "หน่วยความจำว่าง", fmt: (v) => `${fmtNum(v / 1024, 0)}<small>KB</small>` },
+  { k: "uptime_s", name: "เปิดเครื่องมา", fmt: (v) => `<span style="font-family:'Plex Thai';font-size:15px">${fmtDur(v)}</span>` },
+];
+
+function renderNodes() {
+  $("#nodes").innerHTML = overview.devices.map((d) => {
     const st = statusOf(d);
     const L = d.last || {};
     const cov = d.coverage_24h;
-    const covOk = cov != null && cov >= 0.95; // เกณฑ์ ROADMAP ด่าน 2
-    return `<article class="card tile">
-      <div class="tile-head">
-        <div class="dev"><i class="key" style="background:${colorOf(d.device_id)}"></i><span>${esc(d.device_id)}</span></div>
-        <span class="pill">${ICON[st.kind]}${esc(st.text)}</span>
+    const covOk = cov != null && cov >= 0.95;
+    const pm = d.pm_last;
+    const lv = pm && pmLevel(pm.pm25_ugm3);
+    const health = HEALTH.filter((h) => L[h.k] != null);
+    return `<article class="card node" style="--c:${colorOf(d.device_id)}"><div class="node-in">
+      <div class="node-head">
+        <div class="node-name"><span>${esc(d.device_id)}</span></div>
+        <span class="chip ${st.kind}">${ICON[st.kind](12)}${esc(st.text)}</span>
       </div>
-      <div class="hero">${fmtNum(L.temp_c, 1)}<small>°C</small></div>
-      <div class="minor"><span>ความชื้น ${fmtNum(L.rh_pct, 1)}%</span><span>${fmtNum(L.pres_hpa, 1)} hPa</span></div>
-      ${d.pm_last ? (() => { const lv = pmLevel(d.pm_last.pm25_ugm3); return `<div class="pm">${ICON[lv.kind]}PM2.5 <b>${fmtNum(d.pm_last.pm25_ugm3, 0)}</b> µg/m³ · ${lv.text}</div>`; })() : ""}
-      <div class="seen">${d.last ? `ข้อมูลล่าสุดเมื่อ ${fmtAge(overview.now - L.ts)}ที่แล้ว (${fmtTimeS(L.ts)})` : "ยังไม่เคยส่งข้อมูล"}</div>
-      ${cov == null ? "" : `<div class="meter">
-        <div class="meter-label"><span>ข้อมูลครบใน 24 ชม.</span><span>${fmtNum(cov * 100, 1)}% · ${d.received_24h.toLocaleString("th-TH")}/${d.expected_24h.toLocaleString("th-TH")}</span></div>
-        <div class="meter-track"><div class="meter-fill" style="width:${(cov * 100).toFixed(1)}%;background:var(${covOk ? "--good" : "--warning"})"></div></div>
+      ${d.last && L.temp_c == null && L.rh_pct == null && L.pres_hpa == null && !pm ? `<div class="nosensor">${ICON.warning(14)}<div><b>ส่งข้อมูลมาแต่ไม่มีค่าจากเซนเซอร์</b>บอร์ดต่อเน็ตได้ แต่อ่าน BME280 ไม่ได้ ลองตรวจสาย I²C และ address ของเซนเซอร์</div></div>` : `<div class="node-body">
+        <div class="hero"><span class="v">${fmtNum(L.temp_c, 1)}</span><span class="u">°C</span><span class="l">อุณหภูมิ</span></div>
+        <dl class="reads">
+          <div><dt>ความชื้น</dt><dd class="mono">${fmtNum(L.rh_pct, 1)}<small>%</small></dd></div>
+          <div><dt>ความกด</dt><dd class="mono">${fmtNum(L.pres_hpa, 1)}<small>hPa</small></dd></div>
+          ${pm ? `<div><dt>ฝุ่น PM2.5</dt><dd class="mono">${fmtNum(pm.pm25_ugm3, 0)}<small>µg/m³</small></dd><div class="lv">${ICON[lv.kind](11)}${lv.text}</div></div>` : ""}
+          ${health.map((h) => `<div><dt>${h.name}</dt><dd class="mono">${h.fmt(L[h.k])}</dd></div>`).join("")}
+        </dl>
       </div>`}
-    </article>`;
+      <div class="node-foot">
+        ${cov == null ? "" : `<div>
+          <div class="cov-top"><span>ข้อมูลครบใน 24 ชม.</span><span><b class="mono">${fmtNum(cov * 100, 1)}%</b> <span class="of mono">${fmtInt(d.received_24h)}/${fmtInt(d.expected_24h)}</span></span></div>
+          <div class="meter" style="margin-top:8px" role="img" aria-label="ข้อมูลครบ ${fmtNum(cov * 100, 1)} เปอร์เซ็นต์ เกณฑ์ 95"><i style="width:${(cov * 100).toFixed(1)}%;background:var(${covOk ? "--good" : "--warning"})"></i><span class="goal" title="เกณฑ์ 95%"></span></div>
+        </div>`}
+        <div class="seen">${d.last ? `ข้อมูลล่าสุด ${fmtDur(overview.now - L.ts)} ที่แล้ว · <span class="mono">${fmtTimeS(L.ts)}</span>` : "ยังไม่เคยส่งข้อมูล"}</div>
+      </div>
+    </div></article>`;
   }).join("");
 }
 
 function seriesDevices() {
-  return overview.devices.map((d) => d.device_id).filter((id) => series.devices[id]);
+  return overview.devices.map((d) => d.device_id).filter((id) => series.devices[id]?.length);
 }
 
 function renderLegend() {
@@ -275,28 +533,36 @@ function renderLegend() {
 }
 
 // ---------- สเกล ----------
-function niceTicks(min, max, count) {
-  if (!isFinite(min)) return { lo: 0, hi: 1, ticks: [0, 1] };
-  if (min === max) { min -= 1; max += 1; }
-  const raw = (max - min) / count, mag = 10 ** Math.floor(Math.log10(raw)), e = raw / mag;
-  const step = (e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1) * mag;
+function niceStep(raw) {
+  const mag = 10 ** Math.floor(Math.log10(raw)), e = raw / mag;
+  return (e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1) * mag;
+}
+function yScale(m, min, max) {
+  if (m.zero) min = 0;
+  if (m.ref != null) max = Math.max(max, m.ref);
+  if (max - min < m.minSpan) {
+    if (m.zero) max = min + m.minSpan;
+    else { const c = (min + max) / 2; min = c - m.minSpan / 2; max = c + m.minSpan / 2; }
+  }
+  const pad = (max - min) * 0.1;
+  if (!m.zero) min -= pad;
+  max += pad;
+  const step = niceStep((max - min) / 3);
   const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
   const ticks = [];
-  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(10));
-  // ทศนิยมเท่ากันทั้งแกน ตามขนาดช่วงห่าง (0.2 → 1 ตำแหน่ง · 5 → 0 ตำแหน่ง)
-  return { lo, hi, ticks, dp: Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) };
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(+v.toFixed(8));
+  // ทศนิยมเท่ากันทั้งแกน และไม่เกินความละเอียดของค่านั้น
+  const dp = Math.min(m.dp, Math.max(0, -Math.floor(Math.log10(step) + 1e-9)));
+  return { lo, hi, ticks, dp };
 }
-const TSTEPS = [300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+const TSTEPS = [60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
 function timeTicks(from, to, maxTicks) {
   const step = TSTEPS.find((s) => (to - from) / s <= maxTicks) || 86400;
   const off = tzOff(), out = [];
   for (let t = Math.ceil((from + off) / step) * step - off; t <= to; t += step) out.push(t);
   return out;
 }
-function tickLabel(t) {
-  const local = (t + tzOff()) % 86400;
-  return local === 0 ? fmtDate(t) : fmtTime(t);
-}
+const tickLabel = (t) => ((t + tzOff()) % 86400 === 0 ? fmtDate(t) : fmtTime(t));
 
 // เส้นขาดเมื่อช่องว่างระหว่างจุดยาวกว่านี้
 const gapLimit = () => Math.max(series.bucket_s * 2.5, series.interval_s * 3);
@@ -316,137 +582,237 @@ function runs(points, idx) {
   return out;
 }
 
+// ช่วงที่วาด: ถ้าข้อมูลเพิ่งเริ่มกลางช่วง ขยายให้ข้อมูลเต็มกรอบ แทนที่จะเป็นเส้นสั้นชิดขวา
+function computeDomain() {
+  const ids = seriesDevices();
+  let first = Infinity;
+  for (const id of ids) first = Math.min(first, series.devices[id][0][0]);
+  const span = series.to - series.from;
+  if (!isFinite(first) || first - series.from < span * 0.12) return { from: series.from, to: series.to, fitted: false, first };
+  const from = Math.min(Math.max(series.from, first - Math.max(series.bucket_s * 3, 60)), series.to - 600);
+  return { from, to: series.to, fitted: true, first };
+}
+
+function renderFit() {
+  const box = $("#fit");
+  if (!dom.fitted) { box.innerHTML = ""; return; }
+  const have = series.to - dom.first;
+  const better = RANGES.find((h) => h * 3600 >= have * 1.05);
+  box.innerHTML = `<span>มีข้อมูลตั้งแต่ <span class="mono">${fmtWhen(dom.first)}</span> (${fmtDur(have)}) · ขยายเฉพาะช่วงที่มีข้อมูลให้เต็มกรอบ</span>` +
+    (better && better < hours ? `<button type="button" data-goto="${better}">ดูช่วง ${better === 168 ? "7 วัน" : better + " ชม."} ละเอียดกว่า</button>` : "");
+  box.querySelector("button")?.addEventListener("click", (e) => setHours(+e.target.dataset.goto));
+}
+
+// ---------- กรอบกราฟ ----------
 function frame(svg, h) {
-  const w = svg.clientWidth || svg.parentNode.clientWidth;
+  const w = Math.max(200, Math.round(svg.getBoundingClientRect().width || svg.parentNode.clientWidth));
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
   svg.setAttribute("height", h);
   svg.replaceChildren();
-  const x = (t) => M.left + ((t - series.from) / (series.to - series.from)) * (w - M.left - M.right);
-  return { w, x };
+  const pw = w - M.left - M.right;
+  const x = (t) => M.left + ((t - dom.from) / (dom.to - dom.from)) * pw;
+  const tOf = (px) => dom.from + ((px - M.left) / pw) * (dom.to - dom.from);
+  return { w, x, tOf };
 }
-
-function drawXAxis(svg, w, x, yBase, gridTop) {
-  for (const t of timeTicks(series.from, series.to, Math.max(2, Math.floor((w - M.left - M.right) / 90)))) {
-    svg.append(el("line", { x1: x(t), x2: x(t), y1: gridTop, y2: yBase, stroke: "var(--grid)", "stroke-width": 1 }));
-    svg.append(el("text", { x: x(t), y: yBase + 16, "text-anchor": "middle", class: "tick" }, tickLabel(t)));
-  }
-  svg.append(el("line", { x1: M.left, x2: w - M.right, y1: yBase, y2: yBase, stroke: "var(--axis)", "stroke-width": 1 }));
+const plotTicks = (w) => timeTicks(dom.from, dom.to, Math.max(2, Math.floor((w - M.left - M.right) / 96)));
+function vgrid(svg, w, x, y0, y1) {
+  for (const t of plotTicks(w)) svg.append(el("line", { x1: x(t), x2: x(t), y1: y0, y2: y1, stroke: "var(--grid)", "stroke-width": 1 }));
 }
+const plotH = () => (innerWidth <= 720 ? 112 : 136);
 
-// ---------- กราฟเส้น ----------
-function renderLine(m) {
-  const svg = $("#" + m.id);
-  const { w, x } = frame(svg, CHART_H);
-  const ids = seriesDevices();
-  const yBase = CHART_H - M.bottom;
-  let min = Infinity, max = -Infinity;
-  for (const id of ids) for (const p of series.devices[id]) if (p[m.idx] != null) { min = Math.min(min, p[m.idx]); max = Math.max(max, p[m.idx]); }
-  if (min === Infinity) {
-    drawXAxis(svg, w, x, yBase, M.top);
-    const msg = m.zero ? "ยังไม่มีโหนดที่ส่งค่าฝุ่นในช่วงนี้" : "ไม่มีข้อมูลในช่วงนี้";
-    svg.append(el("text", { x: (M.left + w - M.right) / 2, y: CHART_H / 2, "text-anchor": "middle", class: "empty" }, msg));
-    svg.setAttribute("aria-label", `${m.name}: ${msg}`);
-    return;
-  }
-  const dataMin = min, dataMax = max;
-  if (m.zero) min = 0;                       // ฝุ่นเริ่มแกนที่ 0 — ไม่งั้น 18 กับ 22 ดูห่างกันเกินจริง
-  if (m.ref) max = Math.max(max, m.ref.v);   // ให้เส้นมาตรฐานอยู่ในกรอบเสมอ
-  const pad = (max - min) * 0.08 || 0.5;
-  const sc = niceTicks(m.zero ? 0 : min - pad, max + pad, 4);
-  const y = (v) => M.top + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (yBase - M.top);
-
-  for (const v of sc.ticks) {
-    svg.append(el("line", { x1: M.left, x2: w - M.right, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }));
-    svg.append(el("text", { x: M.left - 8, y: y(v) + 4, "text-anchor": "end", class: "tick" }, fmtNum(v, sc.dp)));
-  }
-  drawXAxis(svg, w, x, yBase, M.top);
-  if (m.ref) {
-    svg.append(el("line", { x1: M.left, x2: w - M.right, y1: y(m.ref.v), y2: y(m.ref.v), stroke: "var(--critical)", "stroke-width": 1, "stroke-dasharray": "4 4" }));
-    svg.append(el("text", { x: M.left + 6, y: y(m.ref.v) - 5, class: "reflabel" }, `มาตรฐาน ${m.ref.label}`));
-  }
-  min = dataMin; max = dataMax;  // aria-label ด้านล่างต้องบอกค่าจริง ไม่ใช่ขอบแกน
-
-  const ends = [];
-  for (const id of ids) {
-    // โหนดที่ไม่เคยส่ง field นี้ในช่วงนี้ (เช่น ไม่มีเซนเซอร์ฝุ่น) — ไม่มีเส้น ไม่มีป้าย
-    if (!series.devices[id].some((p) => p[m.idx] != null)) continue;
-    const color = colorOf(id);
-    for (const r of runs(series.devices[id], m.idx)) {
-      if (r.length === 1) {
-        svg.append(el("circle", { cx: x(r[0][0]), cy: y(r[0][m.idx]), r: 2, fill: color }));
-        continue;
-      }
-      const d = r.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[m.idx]).toFixed(1)}`).join("");
-      svg.append(el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
-    }
-    const pts = series.devices[id].filter((p) => p[m.idx] != null);
-    const last = pts[pts.length - 1];
-    svg.append(el("circle", { cx: x(last[0]), cy: y(last[m.idx]), r: 4, fill: color, stroke: "var(--surface)", "stroke-width": 2 }));
-    ends.push({ id, x: x(last[0]), y: y(last[m.idx]), v: last[m.idx] });
-  }
-  // ป้ายปลายเส้น: ถ้าป้ายชนกัน ไม่ขยับหนี — ปล่อยให้ legend + tooltip ทำหน้าที่แทน
-  const clash = ends.some((a, i) => ends.some((b, j) => i < j && Math.abs(a.y - b.y) < 15 && Math.abs(a.x - b.x) < 70));
-  if (!clash) for (const e of ends) {
-    svg.append(el("text", { x: e.x + 8, y: e.y + 4, class: "endlabel" }, ids.length > 1 ? `${e.id} ${fmtNum(e.v, m.dp)}` : fmtNum(e.v, m.dp)));
-  }
-
-  svg.append(el("line", { class: "xhair", x1: 0, x2: 0, y1: M.top, y2: yBase, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" }));
-  const hovers = el("g", { class: "hoverdots" });
-  svg.append(hovers);
-  svg._ctx = { x, y, m, ids };
-  const last = ends.map((e) => `${e.id} ${fmtNum(e.v, m.dp)} ${m.unit}`).join(", ");
-  svg.setAttribute("aria-label", `${m.name} ช่วง ${hours} ชั่วโมง ต่ำสุด ${fmtNum(min, m.dp)} สูงสุด ${fmtNum(max, m.dp)} ${m.unit} · ค่าล่าสุด ${last}`);
-  attachHover(svg, w, x);
-}
-
-// ---------- แถบข้อมูลเข้า ----------
-function renderAvail() {
-  const svg = $("#c-avail");
-  const ids = seriesDevices();
-  const rowH = 18, h = M.top + Math.max(1, ids.length) * rowH + M.bottom;
-  const { w, x } = frame(svg, h);
-  const yBase = h - M.bottom;
-  drawXAxis(svg, w, x, yBase, M.top);
-  if (!ids.length) {
-    svg.append(el("text", { x: (M.left + w - M.right) / 2, y: M.top + 12, "text-anchor": "middle", class: "empty" }, "ไม่มีข้อมูลในช่วงนี้"));
-    svg.setAttribute("aria-label", "ข้อมูลเข้า: ไม่มีข้อมูลในช่วงนี้");
-    return;
-  }
-  const desc = [];
-  ids.forEach((id, i) => {
-    const cy = M.top + i * rowH + rowH / 2;
-    svg.append(el("text", { x: M.left - 8, y: cy + 4, "text-anchor": "end", class: "tick" }, id));
-    svg.append(el("rect", { x: M.left, y: cy - 3, width: w - M.left - M.right, height: 6, rx: 3, fill: "var(--track)" }));
+// ---------- แถว: ข้อมูลเข้า ----------
+function buildAvail(ids) {
+  const row = document.createElement("div");
+  row.className = "row";
+  const lanes = ids.map((id) => {
     const rs = runs(series.devices[id], null);
-    for (const r of rs) {
-      const x0 = x(r[0][0]), x1 = Math.max(x0 + 2, x(Math.min(series.to, r[r.length - 1][0] + series.bucket_s)));
-      svg.append(el("rect", { x: x0, y: cy - 3, width: x1 - x0, height: 6, rx: 3, fill: colorOf(id) }));
+    const gaps = [];
+    for (let i = 1; i < rs.length; i++) {
+      const a = rs[i - 1][rs[i - 1].length - 1][0] + series.bucket_s, b = rs[i][0][0];
+      gaps.push({ a, b });
     }
-    desc.push(`${id} ${rs.length > 1 ? `ขาด ${rs.length - 1} ช่วง` : "ต่อเนื่อง"}`);
+    // หายไปตอนท้าย (เงียบ/ออฟไลน์) ก็นับเป็นช่องว่าง
+    const lastEnd = rs.length ? rs[rs.length - 1][rs[rs.length - 1].length - 1][0] + series.bucket_s : null;
+    if (lastEnd != null && series.to - lastEnd > Math.max(overview.stale_s, gapLimit())) gaps.push({ a: lastEnd, b: series.to, tail: true });
+    return { id, rs, gaps };
   });
-  svg.append(el("line", { class: "xhair", x1: 0, x2: 0, y1: M.top, y2: yBase, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" }));
-  svg.setAttribute("aria-label", `ข้อมูลเข้า ช่วง ${hours} ชั่วโมง: ${desc.join(", ")}`);
-  attachHover(svg, w, x);
+  const sumGaps = (l) => l.gaps.reduce((s, g) => s + (g.b - g.a), 0);
+  const laneText = (l) => l.gaps.length ? `<span class="na" style="color:var(--critical)">ขาด ${l.gaps.length} ช่วง · ${fmtDur(sumGaps(l))}</span>` : `<span class="na">ต่อเนื่อง</span>`;
+  row.innerHTML = `<div class="gut"><h3>ข้อมูลเข้า</h3><div class="when">ช่องแดง = ไม่มีข้อมูล</div>
+    <div class="vals">${lanes.map((l) => `<div class="val lane"><i class="key" style="background:${colorOf(l.id)}"></i><span class="id">${esc(l.id)}</span><span class="n" data-id="${esc(l.id)}">${laneText(l)}</span></div>`).join("")}</div></div>
+    <svg class="plot" role="img"></svg>`;
+  const svg = row.querySelector("svg");
+  const ctx = { kind: "avail", row, svg, lanes, ids };
+  ctx.draw = () => {
+    // สูงอย่างน้อยเท่าช่องซ้าย แล้ววางเลนไว้กลาง
+    const laneH = 24, need = Math.max(1, lanes.length) * laneH, h = Math.max(innerWidth <= 720 ? need + 16 : 100, need + 16), top0 = (h - need) / 2;
+    const { w, x, tOf } = frame(svg, h);
+    ctx.x = x; ctx.tOf = tOf; ctx.w = w; ctx.h = h;
+    vgrid(svg, w, x, 4, h - 2);
+    const defs = el("defs");
+    const pat = el("pattern", { id: "hatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+    pat.append(el("rect", { width: 6, height: 6, fill: "var(--critical-bg)" }), el("line", { x1: 0, y1: 0, x2: 0, y2: 6, stroke: "var(--critical)", "stroke-width": 1.5, opacity: 0.55 }));
+    defs.append(pat); svg.append(defs);
+    lanes.forEach((l, i) => {
+      const cy = top0 + i * laneH + laneH / 2;
+      if (ids.length > 1) svg.append(el("text", { x: M.left - 6, y: cy + 4, "text-anchor": "end", class: "lanelabel" }, l.id));
+      svg.append(el("rect", { x: M.left, y: cy - 5, width: w - M.left - M.right, height: 10, rx: 3, fill: "var(--wash)" }));
+      for (const r of l.rs) {
+        const x0 = x(Math.max(dom.from, r[0][0])), x1 = Math.max(x0 + 2, x(Math.min(series.to, r[r.length - 1][0] + series.bucket_s)));
+        svg.append(el("rect", { x: x0, y: cy - 5, width: x1 - x0, height: 10, rx: 3, fill: colorOf(l.id) }));
+      }
+      for (const g of l.gaps) {
+        const x0 = x(Math.max(dom.from, g.a)), x1 = x(g.b), gw = Math.max(3, x1 - x0);
+        svg.append(el("rect", { x: x0, y: cy - 7, width: gw, height: 14, rx: 2, fill: "url(#hatch)", stroke: "var(--critical)", "stroke-width": 1 }));
+        const label = g.tail ? `เงียบ ${fmtDur(g.b - g.a)}` : fmtDur(g.b - g.a);
+        if (gw > label.length * 6.2 + 12) svg.append(el("text", { x: x0 + gw / 2, y: cy + 4, "text-anchor": "middle", class: "gaplabel", "paint-order": "stroke", stroke: "var(--surface)", "stroke-width": 3 }, label));
+      }
+    });
+    addHoverLayer(ctx);
+    svg.setAttribute("aria-label", `ข้อมูลเข้า: ${lanes.map((l) => `${l.id} ${l.gaps.length ? `ขาด ${l.gaps.length} ช่วง` : "ต่อเนื่อง"}`).join(", ")}`);
+  };
+  ctx.readout = (t) => {
+    for (const l of lanes) {
+      const n = row.querySelector(`.n[data-id="${CSS.escape(l.id)}"]`);
+      if (t == null) {
+        n.innerHTML = laneText(l);
+      } else {
+        const p = pointAt(l.id, t);
+        n.innerHTML = p ? `${p[4]}<small>ข้อความ</small>` : `<span class="na">ไม่มีข้อมูล</span>`;
+      }
+    }
+  };
+  return ctx;
 }
 
-function renderCharts() {
-  if (!series) return;
-  renderAvail();
-  METRICS.forEach(renderLine);
-  if (hoverT != null) showHover(hoverT);
+// ---------- แถว: กราฟเส้น ----------
+function buildLine(m, ids) {
+  const has = ids.filter((id) => series.devices[id].some((p) => p[m.idx] != null));
+  const row = document.createElement("div");
+  if (!has.length) {
+    // ไม่มีข้อมูลค่านี้เลย (เช่น ยังไม่มีโหนดติดเซนเซอร์ฝุ่น) — ย่อเหลือบรรทัดเดียว ไม่กินที่ทั้งแผง
+    row.className = "row note";
+    row.innerHTML = `<p><b>${m.name}</b>${m.key === "pm25" ? "ยังไม่มีโหนดที่ส่งค่าฝุ่นในช่วงนี้ · ติดเซนเซอร์ PMS5003 แล้วกราฟจะขึ้นเอง" : "ไม่มีข้อมูลในช่วงนี้"}</p>`;
+    return { kind: "note", row, empty: true };
+  }
+  let min = Infinity, max = -Infinity;
+  for (const id of has) for (const p of series.devices[id]) if (p[m.idx] != null && p[0] >= dom.from) { min = Math.min(min, p[m.idx]); max = Math.max(max, p[m.idx]); }
+  const lastOf = (id) => { const pts = series.devices[id]; for (let i = pts.length - 1; i >= 0; i--) if (pts[i][m.idx] != null) return pts[i]; return null; };
+  const solo = has.length === 1;
+  row.className = "row";
+  row.innerHTML = `<div class="gut"><h3>${m.name}<small>${m.unit}</small></h3><div class="when">ล่าสุด</div>
+    <div class="vals">${has.map((id) => `<div class="val${solo ? " solo" : ""}">${solo ? "" : `<i class="key" style="background:${colorOf(id)}"></i><span class="id">${esc(id)}</span>`}<span class="n mono" data-id="${esc(id)}"></span></div>`).join("")}</div>
+    <div class="span">ช่วงนี้ <span class="mono">${fmtNum(min, m.dp)}</span> ถึง <span class="mono">${fmtNum(max, m.dp)}</span></div></div>
+    <svg class="plot" role="img"></svg>`;
+  const svg = row.querySelector("svg");
+  const ctx = { kind: "line", m, row, svg, ids: has };
+  ctx.draw = () => {
+    const h = plotH();
+    const { w, x, tOf } = frame(svg, h);
+    const sc = yScale(m, min, max);
+    const yb = h - M.bottom;
+    const y = (v) => M.top + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (yb - M.top);
+    Object.assign(ctx, { x, y, tOf, w, h });
+    for (const v of sc.ticks) {
+      svg.append(el("line", { x1: M.left, x2: w - M.right, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }));
+      svg.append(el("text", { x: M.left - 10, y: y(v) + 4, "text-anchor": "end", class: "tick" }, fmtNum(v, sc.dp)));
+    }
+    vgrid(svg, w, x, M.top, yb);
+    if (m.ref != null) {
+      svg.append(el("line", { x1: M.left, x2: w - M.right, y1: y(m.ref), y2: y(m.ref), stroke: "var(--critical)", "stroke-width": 1.25, "stroke-dasharray": "5 4" }));
+      svg.append(el("text", { x: w - M.right - 4, y: y(m.ref) - 6, "text-anchor": "end", class: "reflabel" }, `มาตรฐาน ${m.ref}`));
+    }
+    const defs = el("defs"); svg.append(defs);
+    for (const id of has) {
+      const color = colorOf(id);
+      const rs = runs(series.devices[id].filter((p) => p[0] >= dom.from - series.bucket_s), m.idx);
+      // เส้นเดียว: ใส่พื้นจาง ๆ ใต้เส้นให้อ่านง่าย · หลายเส้นไม่ใส่ จะทับกันจนรก
+      if (solo) {
+        const gid = `g-${m.key}`;
+        const lg = el("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+        lg.append(el("stop", { offset: "0%", style: `stop-color:${color};stop-opacity:.18` }), el("stop", { offset: "100%", style: `stop-color:${color};stop-opacity:0` }));
+        defs.append(lg);
+        for (const r of rs) if (r.length > 1) {
+          const d = r.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[m.idx]).toFixed(1)}`).join("") + `L${x(r[r.length - 1][0]).toFixed(1)} ${yb}L${x(r[0][0]).toFixed(1)} ${yb}Z`;
+          svg.append(el("path", { d, fill: `url(#${gid})` }));
+        }
+      }
+      for (const r of rs) {
+        if (r.length === 1) { svg.append(el("circle", { cx: x(r[0][0]), cy: y(r[0][m.idx]), r: 2.5, fill: color })); continue; }
+        const d = r.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[m.idx]).toFixed(1)}`).join("");
+        svg.append(el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      }
+      const last = lastOf(id);
+      if (last) svg.append(el("circle", { cx: x(last[0]), cy: y(last[m.idx]), r: 4, fill: color, stroke: "var(--surface)", "stroke-width": 2 }));
+    }
+    addHoverLayer(ctx);
+    svg.setAttribute("aria-label", `${m.name} ช่วง ${hours} ชั่วโมง ต่ำสุด ${fmtNum(min, m.dp)} สูงสุด ${fmtNum(max, m.dp)} ${m.unit} · ค่าล่าสุด ${has.map((id) => `${id} ${fmtNum(lastOf(id)?.[m.idx], m.dp)}`).join(", ")}`);
+  };
+  ctx.readout = (t) => {
+    for (const id of has) {
+      const n = row.querySelector(`.n[data-id="${CSS.escape(id)}"]`);
+      const p = t == null ? lastOf(id) : pointAt(id, t);
+      const v = p?.[m.idx];
+      n.innerHTML = v == null ? `<span class="na">ไม่มีข้อมูล</span>` : `${fmtNum(v, m.dp)}<small>${m.unit}</small>`;
+    }
+  };
+  return ctx;
 }
 
-// ---------- hover: เส้นตั้งร่วมทุกกราฟ + tooltip ----------
-function attachHover(svg, w, x) {
-  const ov = el("rect", { x: M.left, y: 0, width: Math.max(0, w - M.left - M.right), height: svg.viewBox.baseVal.height, fill: "transparent" });
+// ---------- แกนเวลา (ล่างสุด ใช้ร่วมทุกแถว) ----------
+function drawAxis() {
+  const svg = $("#axis");
+  const { w, x } = frame(svg, 30);
+  for (const t of plotTicks(w)) {
+    svg.append(el("line", { x1: x(t), x2: x(t), y1: 0, y2: 5, stroke: "var(--axis)", "stroke-width": 1 }));
+    svg.append(el("text", { x: x(t), y: 20, "text-anchor": "middle", class: (t + tzOff()) % 86400 === 0 ? "tick th" : "tick" }, tickLabel(t)));
+  }
+  const avg = series.bucket_s > series.interval_s;
+  $("#axisnote").textContent = avg ? `จุดละ ${fmtDur(series.bucket_s)} (ค่าเฉลี่ย)` : `จุดละ ${series.interval_s} วินาที`;
+}
+
+function renderScope() {
+  const rows = $("#rows");
+  rowCtx.length = 0;
+  const ids = seriesDevices();
+  if (!ids.length) {
+    dom = { from: series.from, to: series.to, fitted: false };
+    renderFit();
+    const lastTs = Math.max(0, ...overview.devices.map((d) => d.last?.ts || 0));
+    const longer = RANGES.find((h) => h > hours && lastTs && series.to - lastTs < h * 3600);
+    rows.innerHTML = `<div class="row note"><p><b>ไม่มีข้อมูลในช่วงนี้</b>${lastTs ? `ข้อมูลล่าสุดเข้ามาเมื่อ ${fmtDur(series.to - lastTs)} ที่แล้ว` : "รอโหนดส่งข้อมูลเข้ามา"}${longer ? ` · <button type="button" class="link" data-goto="${longer}">ดูช่วง ${longer === 168 ? "7 วัน" : longer + " ชม."}</button>` : ""}</p></div>`;
+    rows.querySelector("[data-goto]")?.addEventListener("click", (e) => setHours(+e.target.dataset.goto));
+    drawAxis();
+    return;
+  }
+  dom = computeDomain();
+  renderFit();
+  const list = [buildAvail(ids)];
+  const lines = METRICS.map((m) => buildLine(m, ids));
+  // แถวที่ไม่มีข้อมูล (ย่อเหลือบรรทัดเดียว) ไปไว้ท้าย ไม่คั่นกลางกราฟ
+  list.push(...lines.filter((c) => !c.empty), ...lines.filter((c) => c.empty));
+  rows.replaceChildren(...list.map((c) => c.row));
+  for (const c of list) { if (c.draw) { c.draw(); rowCtx.push(c); } }
+  drawAxis();
+  if (hoverT != null && hoverT >= dom.from) showHover(hoverT); else rowCtx.forEach((c) => c.readout(null));
+}
+
+// ---------- hover: เส้นตั้งร่วมทุกแถว + ค่าในช่องซ้ายเปลี่ยนตามเวลา ----------
+function addHoverLayer(ctx) {
+  const { svg, w, h } = ctx;
+  const g = el("g", { class: "hover", visibility: "hidden" });
+  g.append(el("line", { class: "xh", x1: 0, x2: 0, y1: 2, y2: h - 2, stroke: "var(--ink-2)", "stroke-width": 1 }));
+  g.append(el("g", { class: "dots" }));
+  svg.append(g);
+  const ov = el("rect", { x: M.left, y: 0, width: Math.max(0, w - M.left - M.right), height: h, fill: "transparent" });
   svg.append(ov);
   const pick = (ev) => {
     const r = svg.getBoundingClientRect();
-    const px = ((ev.clientX - r.left) / r.width) * w;
-    const t = series.from + ((px - M.left) / (w - M.left - M.right)) * (series.to - series.from);
-    return Math.round(t / series.bucket_s) * series.bucket_s;
+    const t = ctx.tOf(((ev.clientX - r.left) / r.width) * w);
+    return Math.max(series.from, Math.min(series.to, Math.round(t / series.bucket_s) * series.bucket_s));
   };
-  ov.addEventListener("pointermove", (ev) => { hoverT = pick(ev); showHover(hoverT, ev, svg); });
+  ov.addEventListener("pointermove", (ev) => { hoverT = pick(ev); showHover(hoverT); });
+  ov.addEventListener("pointerdown", (ev) => { hoverT = pick(ev); showHover(hoverT); });
   ov.addEventListener("pointerleave", () => { hoverT = null; hideHover(); });
 }
 
@@ -457,80 +823,93 @@ function pointAt(id, t) {
   return null;
 }
 
-function showHover(t, ev, srcSvg) {
-  for (const svg of document.querySelectorAll("svg.chart")) {
-    const xh = svg.querySelector(".xhair");
-    if (!xh || !series) continue;
-    const w = svg.viewBox.baseVal.width;
-    const xx = M.left + ((t - series.from) / (series.to - series.from)) * (w - M.left - M.right);
-    xh.setAttribute("x1", xx); xh.setAttribute("x2", xx); xh.setAttribute("visibility", "visible");
-    const g = svg.querySelector(".hoverdots");
-    if (g && svg._ctx) {
-      g.replaceChildren();
-      for (const id of svg._ctx.ids) {
-        const p = pointAt(id, t);
-        if (p && p[svg._ctx.m.idx] != null) g.append(el("circle", { cx: xx, cy: svg._ctx.y(p[svg._ctx.m.idx]), r: 4, fill: colorOf(id), stroke: "var(--surface)", "stroke-width": 2 }));
-      }
+function showHover(t) {
+  const avg = series.bucket_s > series.interval_s;
+  const label = avg ? `เฉลี่ย ${fmtWhen(t)}-${fmtTime(t + series.bucket_s)}` : `เวลา ${sameDay(t, overview.now) ? fmtTimeS(t) : `${fmtDate(t)} ${fmtTimeS(t)}`}`;
+  for (const c of rowCtx) {
+    const g = c.svg.querySelector(".hover");
+    const xx = c.x(t);
+    g.querySelector(".xh").setAttribute("x1", xx); g.querySelector(".xh").setAttribute("x2", xx);
+    g.setAttribute("visibility", "visible");
+    const dots = g.querySelector(".dots");
+    dots.replaceChildren();
+    if (c.kind === "line") for (const id of c.ids) {
+      const p = pointAt(id, t);
+      if (p && p[c.m.idx] != null) dots.append(el("circle", { cx: xx, cy: c.y(p[c.m.idx]), r: 4.5, fill: colorOf(id), stroke: "var(--surface)", "stroke-width": 2 }));
     }
+    const when = c.row.querySelector(".when");
+    if (c.kind === "line") { when.textContent = label; when.classList.add("on"); }
+    else if (c.kind === "avail") { when.textContent = label; when.classList.add("on"); }
+    c.readout(t);
   }
-  if (!ev) return;
-  const tip = $("#tip");
-  const ids = seriesDevices();
-  const ctx = srcSvg._ctx;
-  const head = series.bucket_s > series.interval_s
-    ? `${fmtDate(t)} ${fmtTime(t)}–${fmtTime(t + series.bucket_s)} <span class="na">(เฉลี่ย)</span>`
-    : `${fmtDate(t)} ${fmtTimeS(t)}`;
-  const rows = ids.map((id) => {
-    const p = pointAt(id, t);
-    let val;
-    if (!p) val = '<b class="na">ไม่มีข้อมูล</b>';
-    else if (ctx) val = p[ctx.m.idx] == null ? '<b class="na">–</b>' : `<b>${fmtNum(p[ctx.m.idx], ctx.m.dp)} ${ctx.m.unit}</b>`;
-    else val = `<b>${p[4]} ข้อความ</b>`;
-    return `<div class="row"><i class="key" style="background:${colorOf(id)}"></i>${esc(id)}${val}</div>`;
-  }).join("");
-  tip.innerHTML = `<div class="t">${head}</div>${rows}`;
-  tip.style.display = "block";
-  const tw = tip.offsetWidth, th = tip.offsetHeight;
-  let left = ev.clientX + 14, top = ev.clientY + 14;
-  if (left + tw > innerWidth - 8) left = ev.clientX - tw - 14;
-  if (top + th > innerHeight - 8) top = ev.clientY - th - 14;
-  tip.style.left = Math.max(8, left) + "px"; tip.style.top = Math.max(8, top) + "px";
 }
 
 function hideHover() {
-  $("#tip").style.display = "none";
-  document.querySelectorAll(".xhair").forEach((x) => x.setAttribute("visibility", "hidden"));
-  document.querySelectorAll(".hoverdots").forEach((g) => g.replaceChildren());
+  for (const c of rowCtx) {
+    c.svg.querySelector(".hover")?.setAttribute("visibility", "hidden");
+    const when = c.row.querySelector(".when");
+    when.classList.remove("on");
+    when.textContent = c.kind === "avail" ? "ช่องแดง = ไม่มีข้อมูล" : "ล่าสุด";
+    c.readout(null);
+  }
 }
 
 // ---------- ตาราง ----------
 function renderTable() {
-  if (!series) return;
   const rows = [];
   for (const id of seriesDevices()) for (const p of series.devices[id]) rows.push([id, ...p]);
   rows.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const isAvg = series.bucket_s > series.interval_s;
-  const avg = isAvg ? " (เฉลี่ย)" : "";
+  const avg = isAvg ? " เฉลี่ย" : "";
   const when = (t) => `${fmtDate(t)} ${isAvg ? fmtTime(t) : fmtTimeS(t)}`;
   $("#table").innerHTML = `<thead><tr><th>เวลา</th><th>โหนด</th><th>อุณหภูมิ °C${avg}</th><th>ความชื้น %${avg}</th><th>ความกด hPa${avg}</th><th>PM2.5 µg/m³${avg}</th><th>ข้อความ</th></tr></thead><tbody>` +
-    rows.slice(0, 40).map((r) => `<tr><td>${when(r[1])}</td><td>${esc(r[0])}</td><td>${fmtNum(r[2], 2)}</td><td>${fmtNum(r[3], 1)}</td><td>${fmtNum(r[4], 1)}</td><td>${fmtNum(r[6], 0)}</td><td>${r[5]}</td></tr>`).join("") +
+    (rows.length ? rows.slice(0, 40).map((r) => `<tr><td>${when(r[1])}</td><td>${esc(r[0])}</td><td class="mono">${fmtNum(r[2], 2)}</td><td class="mono">${fmtNum(r[3], 1)}</td><td class="mono">${fmtNum(r[4], 1)}</td><td class="mono">${fmtNum(r[6], 0)}</td><td class="mono">${r[5]}</td></tr>`).join("")
+      : `<tr><td colspan="7" style="text-align:left;color:var(--muted)">ไม่มีข้อมูลในช่วงนี้</td></tr>`) +
     "</tbody>";
+}
+
+function renderFoot() {
+  $("#foot").innerHTML = `<span>อ่านฐานแบบอ่านอย่างเดียว <code>${esc(overview.db)}</code></span><span>ฝุ่น: ระดับตามเกณฑ์กรมควบคุมมลพิษ ปี 2566 เทียบค่าเฉลี่ย 24 ชม. ค่าบนหน้านี้เป็นค่าขณะนั้น</span>`;
 }
 
 // ---------- ช่วงเวลา ----------
 function syncRanges() {
   document.querySelectorAll("#ranges button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.h === hours)));
 }
-document.querySelectorAll("#ranges button").forEach((b) => b.addEventListener("click", () => {
-  hours = +b.dataset.h;
+function setHours(h) {
+  hours = h;
   try { localStorage.setItem("iotlab-hours", hours); } catch (_) {}
   syncRanges(); load();
-}));
-if (![1, 6, 24, 168].includes(hours)) hours = 24;
+}
+document.querySelectorAll("#ranges button").forEach((b) => b.addEventListener("click", () => setHours(+b.dataset.h)));
 syncRanges();
 
-let rt;
-addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderCharts, 120); });
+// ---------- ธีม: อัตโนมัติ → สว่าง → มืด ----------
+const THEMES = [
+  { v: "auto", text: "ธีมตามเครื่อง" },
+  { v: "light", text: "ธีมสว่าง" },
+  { v: "dark", text: "ธีมมืด" },
+];
+function themeNow() { return document.documentElement.dataset.theme || "auto"; }
+function syncTheme() {
+  const t = THEMES.find((x) => x.v === themeNow());
+  $("#theme").innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M7 1.5a5.5 5.5 0 0 1 0 11z" fill="currentColor"/></svg><span class="tl">${t.text}</span>`;
+  $("#theme").setAttribute("aria-label", `${t.text} (กดเพื่อสลับ)`);
+  $("#theme").title = t.text;
+}
+$("#theme").addEventListener("click", () => {
+  const next = THEMES[(THEMES.findIndex((x) => x.v === themeNow()) + 1) % THEMES.length].v;
+  if (next === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = next;
+  try { next === "auto" ? localStorage.removeItem("iotlab-theme") : localStorage.setItem("iotlab-theme", next); } catch (_) {}
+  syncTheme();
+});
+syncTheme();
+
+let rt, lastW = innerWidth;
+addEventListener("resize", () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => { if (series && overview) { renderScope(); } lastW = innerWidth; }, 120);
+});
 load();
 setInterval(load, REFRESH_MS);
 </script>
